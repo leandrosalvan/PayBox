@@ -72,14 +72,14 @@ A forma mais fácil é usar o **Blueprint** do Render com o arquivo `render.yaml
 
 1. Faça push do projeto para o GitHub.
 2. No Render, crie um **Blueprint** e conecte o repositório.
-3. O Render criará automaticamente:
-   - O banco PostgreSQL (`paybox-db`)
-   - O Web Service (`paybox`)
-4. Após o deploy, adicione manualmente as variáveis sensíveis em **Environment**:
+3. O Render criará o Web Service (`paybox`).
+4. Crie um banco PostgreSQL no **Neon** (ou outro) e copie a `DATABASE_URL`.
+5. Após o primeiro deploy, vá em **Environment** do serviço e adicione:
+   - `DATABASE_URL` (connection string do Neon)
    - `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` (opcional)
    - `BREVO_SMTP_USER`, `BREVO_SMTP_PASS`, `FROM_EMAIL`
    - Ajuste `NEXTAUTH_URL` para a URL do seu app no Render
-5. Redeploy o serviço.
+6. Redeploy o serviço.
 
 > O arquivo `render.yaml` já define o build, start e `NEXTAUTH_SECRET` automático.
 > O script `scripts/render-build.sh` converte o Prisma para PostgreSQL durante o deploy.
