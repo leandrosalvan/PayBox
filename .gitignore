@@ -1,0 +1,43 @@
+# Environment variables
+.env.local
+.env
+
+# Next.js
+/.next/
+/out/
+
+# Dependencies
+/node_modules
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Prisma
+/prisma/migrations/
+
+# SQLite
+*.db
+*.db-journal
+
+# PWA generated files
+public/sw.js
+public/sw.js.map
+public/workbox-*.js
+public/workbox-*.js.map
+
+# Dev logs
+dev.log
+dev.err
+
+# TS build info
+tsconfig.tsbuildinfo
