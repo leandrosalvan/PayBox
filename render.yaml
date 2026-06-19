@@ -3,7 +3,7 @@ services:
     name: paybox
     env: node
     plan: free
-    buildCommand: bash -c "set -x; echo 'DATABASE_URL is set:' \${DATABASE_URL:+yes}; sed -i 's/provider = \"sqlite\"/provider = \"postgresql\"/g' prisma/schema.prisma && npx prisma generate && npx prisma db push --accept-data-loss && npm run build"
+    buildCommand: bash -c "set -x; echo 'DATABASE_URL is set:' \${DATABASE_URL:+yes}; sed -i 's/provider = \"sqlite\"/provider = \"postgresql\"/g' prisma/schema.prisma && npx prisma generate && npm run build"
     startCommand: npm start
     envVars:
       - key: DATABASE_URL

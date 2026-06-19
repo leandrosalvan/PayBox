@@ -83,10 +83,12 @@ A forma mais fácil é usar o **Blueprint** do Render com o arquivo `render.yaml
 
 > O arquivo `render.yaml` já define o build, start e `NEXTAUTH_SECRET` automático.
 > O build converte o Prisma para PostgreSQL automaticamente.
+> O comando `npx prisma db push` deve ser rodado uma vez no **Shell** do Render após o primeiro deploy.
 
 Deploy manual (alternativa):
-- **Build command:** `bash -c "sed -i 's/provider = \"sqlite\"/provider = \"postgresql\"/g' prisma/schema.prisma && npx prisma generate && npx prisma db push --accept-data-loss && npm run build"`
+- **Build command:** `bash -c "sed -i 's/provider = \"sqlite\"/provider = \"postgresql\"/g' prisma/schema.prisma && npx prisma generate && npm run build"`
 - **Start command:** `npm start`
+- Após o deploy, rode no Shell: `npx prisma db push --accept-data-loss`
 
 ## Compartilhamento de carteira
 
