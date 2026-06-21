@@ -37,7 +37,13 @@ export default function Login() {
 
   async function handleGoogle() {
     setLoading(true)
-    await signIn('google', { callbackUrl })
+    setError('')
+    try {
+      await signIn('google', { callbackUrl })
+    } catch {
+      setError('Erro ao conectar com o Google. Verifique sua conexão.')
+      setLoading(false)
+    }
   }
 
   return (
