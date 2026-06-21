@@ -60,11 +60,23 @@ Para envio de e-mails (redefinição de senha), configure uma conta de remetente
 
 ## Login com Google
 
+### Desenvolvimento local
+
 1. Crie um projeto em https://console.cloud.google.com/
 2. Configure a tela de consentimento OAuth
 3. Crie credenciais OAuth 2.0 para Web
-4. Adicione `http://localhost:3000/api/auth/callback/google` nas URIs autorizadas
-5. Preencha `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`
+4. Em **URIs de redirecionamento autorizadas**, adicione:
+   - `http://localhost:3000/api/auth/callback/google`
+5. Preencha `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` no `.env.local`
+
+### Produção (Render)
+
+1. Acesse as credenciais OAuth 2.0 do projeto no Google Cloud Console
+2. Em **URIs de redirecionamento autorizadas**, adicione também:
+   - `https://paybox-8j56.onrender.com/api/auth/callback/google`
+3. Verifique se a variável `NEXTAUTH_URL` no Render está com a URL exata do deploy:
+   - `https://paybox-8j56.onrender.com`
+4. Confirme que `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` estão preenchidos nas variáveis de ambiente do Render
 
 ## Deploy no Render
 
@@ -78,7 +90,7 @@ A forma mais fácil é usar o **Blueprint** do Render com o arquivo `render.yaml
    - `DATABASE_URL` (connection string do Neon)
    - `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` (opcional)
    - `BREVO_SMTP_USER`, `BREVO_SMTP_PASS`, `FROM_EMAIL`
-   - Ajuste `NEXTAUTH_URL` para a URL do seu app no Render
+   - Ajuste `NEXTAUTH_URL` para a URL exata do seu app no Render (ex: `https://paybox-8j56.onrender.com`)
 6. Redeploy o serviço.
 
 > O arquivo `render.yaml` já define o build, start e `NEXTAUTH_SECRET` automático.

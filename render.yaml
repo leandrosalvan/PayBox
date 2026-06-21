@@ -9,7 +9,7 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: NEXTAUTH_URL
-        value: https://paybox.onrender.com
+        value: https://paybox-8j56.onrender.com
       - key: NEXTAUTH_SECRET
         generateValue: true
       - key: GOOGLE_CLIENT_ID
