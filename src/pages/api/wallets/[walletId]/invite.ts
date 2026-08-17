@@ -11,13 +11,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { walletId } = req.query
   if (typeof walletId !== 'string') return res.status(400).json({ error: 'ID inválido' })
 
+  let membership
   try {
-    await requireWalletMember(walletId, userId)
+    membership = await requireWalletMember(walletId, userId)
   } catch {
     return res.status(403).json({ error: 'Acesso negado' })
   }
 
   if (req.method !== 'POST') return res.status(405).end()
+  if (membership.role !== 'owner') return res.status(403).json({ error: 'Apenas o proprietário pode convidar membros' })
 
   const { email } = req.body
   if (!email) return res.status(400).json({ error: 'E-mail obrigatório' })

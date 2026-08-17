@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import type { ChangeEvent } from 'react'
 import { getSession } from 'next-auth/react'
@@ -30,12 +30,7 @@ export default function WalletSettings() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
-  useEffect(() => {
-    if (!walletId || typeof walletId !== 'string') return
-    fetchData()
-  }, [walletId])
-
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     const res = await fetch(`/api/wallets/${walletId}`)
     if (res.ok) {
       const data = await res.json()
@@ -43,7 +38,12 @@ export default function WalletSettings() {
       setMembers(data.members)
       setCategories(data.categories)
     }
-  }
+  }, [walletId])
+
+  useEffect(() => {
+    if (!walletId || typeof walletId !== 'string') return
+    fetchData()
+  }, [walletId, fetchData])
 
   async function handleUpdateWallet(e: React.FormEvent) {
     e.preventDefault()
@@ -51,10 +51,11 @@ export default function WalletSettings() {
     const res = await fetch(`/api/wallets/${walletId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(wallet),
+      body: JSON.stringify({ ...wallet, expectedUpdatedAt: wallet.updatedAt }),
     })
     if (res.ok) {
       setMessage('Carteira atualizada')
+      fetchData()
     } else {
       const data = await res.json()
       setError(data.error || 'Erro ao atualizar')

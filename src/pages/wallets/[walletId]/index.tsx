@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import { getSession, useSession } from 'next-auth/react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
@@ -29,18 +29,12 @@ export default function WalletHome() {
     return `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
   }, [currentDate])
 
-  useEffect(() => {
-    if (!walletId || typeof walletId !== 'string' || !session) return
-    fetchWallet()
-    fetchExpenses()
-  }, [walletId, session, monthKey])
-
-  async function fetchWallet() {
+  const fetchWallet = useCallback(async () => {
     const res = await fetch(`/api/wallets/${walletId}`)
     if (res.ok) setWallet(await res.json())
-  }
+  }, [walletId])
 
-  async function fetchExpenses() {
+  const fetchExpenses = useCallback(async () => {
     setLoading(true)
     const res = await fetch(`/api/wallets/${walletId}/expenses?month=${monthKey}`)
     if (res.ok) {
@@ -48,10 +42,23 @@ export default function WalletHome() {
       setExpenses(data.expenses)
     }
     setLoading(false)
-  }
+  }, [monthKey, walletId])
 
-  async function togglePay(expenseId: string) {
-    const res = await fetch(`/api/wallets/${walletId}/expenses/${expenseId}/pay`, { method: 'POST' })
+  useEffect(() => {
+    if (!walletId || typeof walletId !== 'string' || !session) return
+    fetchWallet()
+    fetchExpenses()
+  }, [walletId, session, fetchWallet, fetchExpenses])
+
+  async function togglePay(expense: any) {
+    const res = await fetch(`/api/wallets/${walletId}/expenses/${expense.id}/pay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: expense.status === 'paid' ? 'pending' : 'paid',
+        expectedUpdatedAt: expense.updatedAt,
+      }),
+    })
     if (res.ok) fetchExpenses()
   }
 
@@ -155,7 +162,7 @@ export default function WalletHome() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        togglePay(expense.id)
+                        togglePay(expense)
                       }}
                       className={`text-xs ${expense.status === 'paid' ? 'text-primary-400' : 'text-slate-400'}`}
                     >
