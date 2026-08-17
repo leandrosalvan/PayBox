@@ -1,13 +1,13 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
-import { loadMcpConfig } from './config'
+import { loadMcpConfig, type PayboxMcpConfig } from './config'
 import { logger } from './logger'
 import { PayboxClient } from './paybox-client'
 import { registerAllTools } from './tools'
 
-export function createPayboxMcpServer() {
+export function createPayboxMcpServer(config: PayboxMcpConfig = loadMcpConfig()) {
   const server = new McpServer({ name: 'paybox', version: '1.0.0' })
-  registerAllTools(server, new PayboxClient(loadMcpConfig()))
+  registerAllTools(server, new PayboxClient(config))
   return server
 }
 

@@ -108,9 +108,19 @@ Cada carteira possui um link de convite único. Em **Configurações da carteira
 
 ## MCP do PayBox
 
-O servidor MCP local usa `stdio` e chama somente a API interna autenticada do PayBox. Ele não acessa o Prisma, o PostgreSQL, sessões NextAuth nem senhas.
+Cada usuário autenticado pode gerenciar suas próprias credenciais em **Carteiras → Integrações**. O token é exibido uma única vez, armazenado somente como hash e dá acesso apenas às carteiras das quais aquele usuário participa.
 
-Variáveis do servidor web:
+O endpoint remoto usa MCP Streamable HTTP:
+
+```text
+https://SEU_DOMINIO/api/mcp
+```
+
+No cliente MCP, envie a credencial pelo cabeçalho `Authorization: Bearer SEU_TOKEN`. A tela permite criar credenciais somente leitura ou liberar escopos específicos, além de revogar o acesso imediatamente. Clientes diferentes devem usar credenciais diferentes.
+
+O servidor local via `stdio` continua disponível como opção de compatibilidade. Ele chama somente a API interna autenticada do PayBox e não acessa diretamente o Prisma, o PostgreSQL, sessões NextAuth nem senhas.
+
+As variáveis abaixo pertencem apenas ao modo global antigo e não são necessárias para credenciais criadas no frontend:
 
 ```dotenv
 PAYBOX_MCP_TOKEN=""
@@ -119,7 +129,7 @@ PAYBOX_MCP_SCOPES="read"
 PAYBOX_MCP_WRITE_ENABLED="false"
 ```
 
-Variáveis da máquina que executa o MCP:
+Variáveis da máquina que executa o cliente local via `stdio`:
 
 ```dotenv
 PAYBOX_BASE_URL="http://localhost:3000"
@@ -134,13 +144,13 @@ npm run mcp:check
 mcp\start-paybox-mcp.cmd
 ```
 
-Comece sempre com `PAYBOX_MCP_SCOPES=read` e `PAYBOX_MCP_WRITE_ENABLED=false`. As consultas são puras; mutações exigem escopo, trava habilitada, `Idempotency-Key` e auditoria. Exclusões exigem uma prévia separada e `confirmationId` de uso único.
+Comece sempre com uma credencial somente leitura. As consultas são puras; mutações exigem escopo, trava habilitada na própria credencial, `Idempotency-Key` e auditoria. Exclusões exigem uma prévia separada e `confirmationId` de uso único.
 
 Use um `PAYBOX_MCP_TOKEN` aleatório com pelo menos 32 caracteres. O cliente aceita HTTP somente em loopback (`localhost`, `127.0.0.1` ou `::1`); conexões remotas exigem HTTPS e redirecionamentos são recusados para não encaminhar o token.
 
 O script `prisma/backfill-wallet-owners.ts` promove o membro mais antigo somente em carteiras sem proprietário. A execução local ou em produção precisa de revisão e autorização explícita; ele não faz parte do build.
 
-No Hermes para Windows, prefira registrar `C:\Projetos\PayBox\mcp\start-paybox-mcp.cmd`. O bootstrap chama o `tsx` diretamente e mantém o `stdout` exclusivo do protocolo; `npm run` pode imprimir um cabeçalho antes de iniciar o servidor.
+Para clientes locais que usam `stdio` no Windows, registre `C:\Projetos\PayBox\mcp\start-paybox-mcp.cmd`. O bootstrap chama o `tsx` diretamente e mantém o `stdout` exclusivo do protocolo; `npm run` pode imprimir um cabeçalho antes de iniciar o servidor. O endpoint Streamable HTTP é a opção indicada para clientes remotos e não depende do Hermes.
 
 ## Licença
 
