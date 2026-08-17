@@ -1,7 +1,7 @@
-const withPWA = require('next-pwa')({
-  dest: 'public',
+const withSerwist = require('@serwist/next').default({
+  swSrc: 'src/sw.ts',
+  swDest: 'public/sw.js',
   register: true,
-  skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
 })
 
@@ -11,4 +11,4 @@ const nextConfig = {
   output: 'standalone',
 }
 
-module.exports = withPWA(nextConfig)
+module.exports = withSerwist(nextConfig)
