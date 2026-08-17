@@ -10,8 +10,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { walletId } = req.query
   if (typeof walletId !== 'string') return res.status(400).json({ error: 'ID inválido' })
 
+  let membership
   try {
-    await requireWalletMember(walletId, userId)
+    membership = await requireWalletMember(walletId, userId)
   } catch {
     return res.status(403).json({ error: 'Acesso negado' })
   }
@@ -29,15 +30,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'PUT') {
-    const { name, locale, currency, salaryMode } = req.body
-    const wallet = await prisma.wallet.update({
-      where: { id: walletId },
+    if (membership.role !== 'owner') return res.status(403).json({ error: 'Apenas o proprietário pode editar a carteira' })
+    const { name, locale, currency, salaryMode, expectedUpdatedAt } = req.body
+    if (typeof expectedUpdatedAt !== 'string') return res.status(400).json({ error: 'Versão da carteira obrigatória' })
+    const changed = await prisma.wallet.updateMany({
+      where: { id: walletId, updatedAt: new Date(expectedUpdatedAt) },
       data: { name, locale, currency, salaryMode },
     })
+    if (changed.count !== 1) return res.status(409).json({ error: 'Carteira foi alterada; atualize a página' })
+    const wallet = await prisma.wallet.findUnique({ where: { id: walletId } })
     return res.status(200).json(wallet)
   }
 
   if (req.method === 'DELETE') {
+    if (membership.role !== 'owner') return res.status(403).json({ error: 'Apenas o proprietário pode excluir a carteira' })
     await prisma.wallet.delete({ where: { id: walletId } })
     return res.status(204).end()
   }

@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { requireWalletMember } from '@/lib/wallet'
+import { assertOwnerCanBeRemoved } from '@/lib/mcp/authorization'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = await requireAuth(req, res)
@@ -10,8 +11,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { walletId } = req.query
   if (typeof walletId !== 'string') return res.status(400).json({ error: 'ID inválido' })
 
+  let membership
   try {
-    await requireWalletMember(walletId, userId)
+    membership = await requireWalletMember(walletId, userId)
   } catch {
     return res.status(403).json({ error: 'Acesso negado' })
   }
@@ -26,6 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'PATCH') {
+    if (membership.role !== 'owner') return res.status(403).json({ error: 'Apenas o proprietário pode alterar salários' })
     const { memberId, salary } = req.body
     const member = await prisma.walletMember.update({
       where: { id: memberId, walletId },
@@ -36,10 +39,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'DELETE') {
+    if (membership.role !== 'owner') return res.status(403).json({ error: 'Apenas o proprietário pode remover membros' })
     const { memberId } = req.query
     if (typeof memberId !== 'string') return res.status(400).json({ error: 'ID inválido' })
 
-    // Garantir que a carteira não fique sem nenhum membro? Não, conforme solicitado.
+    try {
+      await assertOwnerCanBeRemoved(walletId, memberId)
+    } catch (error) {
+      const statusCode = (error as { statusCode?: number }).statusCode || 400
+      return res.status(statusCode).json({ error: (error as Error).message })
+    }
     await prisma.walletMember.delete({ where: { id: memberId, walletId } })
     return res.status(204).end()
   }

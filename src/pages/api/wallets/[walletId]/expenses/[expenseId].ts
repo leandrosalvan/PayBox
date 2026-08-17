@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { requireWalletMember } from '@/lib/wallet'
+import { assertCategoryInWallet, assertUserInWallet } from '@/server/paybox/validation'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = await requireAuth(req, res)
@@ -33,7 +34,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'PUT') {
-    const { description, amount, dueDate, categoryId, paidById } = req.body
+    const { description, amount, dueDate, categoryId, paidById, expectedUpdatedAt } = req.body
+    if (typeof expectedUpdatedAt !== 'string') {
+      return res.status(400).json({ error: 'Versão da despesa obrigatória' })
+    }
     const data: any = {}
     if (description !== undefined) data.description = description
     if (typeof amount === 'number') data.amount = amount
@@ -41,15 +45,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (categoryId !== undefined) data.categoryId = categoryId || null
     if (paidById !== undefined) data.paidById = paidById || null
 
-    const updated = await prisma.expense.update({
-      where: { id: expenseId },
-      data,
-      include: {
-        category: { select: { id: true, name: true, color: true, icon: true } },
-        paidBy: { select: { id: true, name: true, email: true } },
-        series: { select: { id: true, type: true, totalInstallments: true } },
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      await assertCategoryInWallet(tx, walletId, categoryId)
+      await assertUserInWallet(tx, walletId, paidById)
+      const changed = await tx.expense.updateMany({
+        where: { id: expenseId, walletId, updatedAt: new Date(expectedUpdatedAt) },
+        data,
+      })
+      if (changed.count !== 1) return null
+      return tx.expense.findFirst({
+        where: { id: expenseId, walletId },
+        include: {
+          category: { select: { id: true, name: true, color: true, icon: true } },
+          paidBy: { select: { id: true, name: true, email: true } },
+          series: { select: { id: true, type: true, totalInstallments: true } },
+        },
+      })
     })
+    if (!updated) return res.status(409).json({ error: 'Despesa foi alterada; atualize a página' })
     return res.status(200).json(updated)
   }
 

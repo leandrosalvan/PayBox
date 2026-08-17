@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import type { ChangeEvent } from 'react'
 import { getSession } from 'next-auth/react'
@@ -34,12 +34,7 @@ export default function ExpenseDetail() {
   const [error, setError] = useState('')
   const [convertInstallments, setConvertInstallments] = useState('2')
 
-  useEffect(() => {
-    if (!walletId || !expenseId || typeof walletId !== 'string' || typeof expenseId !== 'string') return
-    fetchData()
-  }, [walletId, expenseId])
-
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     const [walletRes, expenseRes] = await Promise.all([
       fetch(`/api/wallets/${walletId}`),
       fetch(`/api/wallets/${walletId}/expenses/${expenseId}`),
@@ -59,7 +54,12 @@ export default function ExpenseDetail() {
       setCategoryId(e.categoryId || '')
       setPaidById(e.paidById || '')
     }
-  }
+  }, [expenseId, walletId])
+
+  useEffect(() => {
+    if (!walletId || !expenseId || typeof walletId !== 'string' || typeof expenseId !== 'string') return
+    fetchData()
+  }, [walletId, expenseId, fetchData])
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -68,7 +68,14 @@ export default function ExpenseDetail() {
     const res = await fetch(`/api/wallets/${walletId}/expenses/${expenseId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ description, amount: amountCents, dueDate, categoryId, paidById }),
+      body: JSON.stringify({
+        description,
+        amount: amountCents,
+        dueDate,
+        categoryId,
+        paidById,
+        expectedUpdatedAt: expense.updatedAt,
+      }),
     })
     if (res.ok) {
       router.push(`/wallets/${walletId}`)
@@ -82,7 +89,12 @@ export default function ExpenseDetail() {
   async function handlePay() {
     const res = await fetch(`/api/wallets/${walletId}/expenses/${expenseId}/pay`, {
       method: 'POST',
-      body: JSON.stringify({ paidById }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        paidById,
+        status: expense.status === 'paid' ? 'pending' : 'paid',
+        expectedUpdatedAt: expense.updatedAt,
+      }),
     })
     if (res.ok) fetchData()
   }

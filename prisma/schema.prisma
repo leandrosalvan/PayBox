@@ -8,22 +8,22 @@ datasource db {
 }
 
 model User {
-  id                 String              @id @default(cuid())
-  email              String              @unique
+  id                 String          @id @default(cuid())
+  email              String          @unique
   emailVerified      DateTime?
   name               String?
   image              String?
   password           String?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
   accounts           Account[]
   sessions           Session[]
   walletMemberships  WalletMember[]
-  invitesSent        WalletInvite[]      @relation("InvitedBy")
-  expensesCreated    Expense[]           @relation("CreatedBy")
-  expensesPaid       Expense[]           @relation("PaidBy")
-  seriesCreated      ExpenseSeries[]     @relation("SeriesCreatedBy")
-  seriesDefaultPayer  ExpenseSeries[]     @relation("SeriesDefaultPayer")
+  invitesSent        WalletInvite[]  @relation("InvitedBy")
+  expensesCreated    Expense[]       @relation("CreatedBy")
+  expensesPaid       Expense[]       @relation("PaidBy")
+  seriesCreated      ExpenseSeries[] @relation("SeriesCreatedBy")
+  seriesDefaultPayer ExpenseSeries[] @relation("SeriesDefaultPayer")
 }
 
 model Account {
@@ -70,14 +70,14 @@ model PasswordResetToken {
 }
 
 model Wallet {
-  id          String         @id @default(cuid())
-  inviteToken String         @unique @default(cuid())
+  id          String          @id @default(cuid())
+  inviteToken String          @unique @default(cuid())
   name        String
-  locale      String         @default("pt-BR")
-  currency    String         @default("BRL")
-  salaryMode  String         @default("joint")
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  locale      String          @default("pt-BR")
+  currency    String          @default("BRL")
+  salaryMode  String          @default("joint")
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
   members     WalletMember[]
   invites     WalletInvite[]
   categories  Category[]
@@ -86,11 +86,11 @@ model Wallet {
 }
 
 model WalletMember {
-  id       String  @id @default(cuid())
+  id       String   @id @default(cuid())
   walletId String
   userId   String
-  salary   Int @default(0)
-  role     String  @default("member")
+  salary   Int      @default(0)
+  role     String   @default("member")
   joinedAt DateTime @default(now())
 
   wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
@@ -100,14 +100,14 @@ model WalletMember {
 }
 
 model WalletInvite {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   walletId    String
   email       String
-  token       String    @unique
-  status      String    @default("pending")
+  token       String   @unique
+  status      String   @default("pending")
   invitedById String?
   expiresAt   DateTime
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime @default(now())
 
   wallet    Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
   invitedBy User?  @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
@@ -131,30 +131,30 @@ model Category {
 }
 
 model ExpenseSeries {
-  id                  String     @id @default(cuid())
-  walletId            String
-  description         String
-  amount              Int
-  dueDay              Int
-  categoryId          String?
-  startDate           DateTime
-  endDate             DateTime?
-  type                String     @default("single")
-  totalInstallments   Int?
-  createdById         String
-  paidByDefaultId     String?
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
+  id                String    @id @default(cuid())
+  walletId          String
+  description       String
+  amount            Int
+  dueDay            Int
+  categoryId        String?
+  startDate         DateTime
+  endDate           DateTime?
+  type              String    @default("single")
+  totalInstallments Int?
+  createdById       String
+  paidByDefaultId   String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  wallet          Wallet     @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  category        Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  createdBy       User       @relation("SeriesCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
-  paidByDefault   User?      @relation("SeriesDefaultPayer", fields: [paidByDefaultId], references: [id], onDelete: SetNull)
-  expenses        Expense[]
+  wallet        Wallet    @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  category      Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdBy     User      @relation("SeriesCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  paidByDefault User?     @relation("SeriesDefaultPayer", fields: [paidByDefaultId], references: [id], onDelete: SetNull)
+  expenses      Expense[]
 }
 
 model Expense {
-  id                String           @id @default(cuid())
+  id                String    @id @default(cuid())
   seriesId          String?
   walletId          String
   description       String
@@ -162,11 +162,11 @@ model Expense {
   dueDate           DateTime
   paidAt            DateTime?
   paidById          String?
-  status            String           @default("pending")
+  status            String    @default("pending")
   installmentNumber Int?
   createdById       String
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   wallet     Wallet         @relation(fields: [walletId], references: [id], onDelete: Cascade)
   series     ExpenseSeries? @relation(fields: [seriesId], references: [id], onDelete: Cascade)
@@ -174,4 +174,54 @@ model Expense {
   createdBy  User           @relation("CreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
   category   Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   categoryId String?
+}
+
+model McpIdempotencyRecord {
+  id           String   @id @default(cuid())
+  key          String
+  userId       String
+  tool         String
+  inputHash    String
+  state        String   @default("pending")
+  statusCode   Int?
+  responseText String?
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+
+  @@unique([userId, tool, key])
+  @@index([expiresAt])
+}
+
+model McpConfirmation {
+  id          String    @id
+  userId      String
+  walletId    String
+  action      String
+  target      String
+  inputHash   String
+  previewText String
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  executedAt  DateTime?
+
+  @@index([userId, walletId, action])
+  @@index([expiresAt])
+}
+
+model McpAuditEvent {
+  id           String   @id @default(cuid())
+  requestId    String
+  userId       String?
+  walletId     String?
+  action       String
+  resourceType String?
+  resourceId   String?
+  result       String
+  metadataText String?
+  createdAt    DateTime @default(now())
+
+  @@index([requestId])
+  @@index([userId, createdAt])
+  @@index([walletId, createdAt])
 }

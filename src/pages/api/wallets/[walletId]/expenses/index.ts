@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { requireWalletMember } from '@/lib/wallet'
 import { ExpenseType, generateSeriesInstances, getMonthRange, parseMonth, renewFixedSeriesIfNeeded, updateOverdueStatus } from '@/lib/expenses'
+import { assertCategoryInWallet, assertUserInWallet } from '@/server/paybox/validation'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = await requireAuth(req, res)
@@ -63,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       paidById,
     } = req.body
 
-    if (!description || typeof amount !== 'number' || !dueDay || !dueDate || !type) {
+    if (!description || description.length > 200 || typeof amount !== 'number' || amount <= 0 || !dueDay || !dueDate || !type) {
       return res.status(400).json({ error: 'Dados incompletos' })
     }
 
@@ -77,51 +78,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 12, 1)
     } else if (expenseType === 'installment') {
       const installments = Number(totalInstallments) || 1
+      if (installments < 2 || installments > 120) {
+        return res.status(400).json({ error: 'Quantidade de parcelas inválida' })
+      }
       count = installments
       endDate = new Date(startDate.getFullYear(), startDate.getMonth() + installments, 1)
     }
 
-    const series = await prisma.expenseSeries.create({
-      data: {
+    const { series, createdExpenses } = await prisma.$transaction(async (tx) => {
+      await assertCategoryInWallet(tx, walletId, categoryId || null)
+      await assertUserInWallet(tx, walletId, paidById || userId)
+      const series = await tx.expenseSeries.create({
+        data: {
+          walletId,
+          description,
+          amount,
+          dueDay: Number(dueDay),
+          categoryId: categoryId || null,
+          startDate,
+          endDate,
+          type: expenseType,
+          totalInstallments: expenseType === 'installment' ? count : null,
+          createdById: userId,
+          paidByDefaultId: paidById || userId,
+        },
+      })
+      const instances = generateSeriesInstances(
         walletId,
-        description,
-        amount,
-        dueDay: Number(dueDay),
-        categoryId: categoryId || null,
+        series.id,
         startDate,
-        endDate,
-        type: expenseType,
-        totalInstallments: expenseType === 'installment' ? count : null,
-        createdById: userId,
-        paidByDefaultId: paidById || userId,
-      },
-    })
-
-    const instances = generateSeriesInstances(
-      walletId,
-      series.id,
-      startDate,
-      series.dueDay,
-      count,
-      {
-        description,
-        amount,
-        categoryId: categoryId || null,
-        paidById: paidById || userId,
-        createdById: userId,
-      },
-      expenseType
-    )
-
-    await prisma.expense.createMany({ data: instances })
-
-    const createdExpenses = await prisma.expense.findMany({
-      where: { seriesId: series.id },
-      include: {
-        category: { select: { id: true, name: true, color: true, icon: true } },
-        paidBy: { select: { id: true, name: true, email: true } },
-      },
-      orderBy: { dueDate: 'asc' },
+        series.dueDay,
+        count,
+        { description, amount, categoryId: categoryId || null, paidById: paidById || userId, createdById: userId },
+        expenseType
+      )
+      await tx.expense.createMany({ data: instances })
+      const createdExpenses = await tx.expense.findMany({
+        where: { seriesId: series.id },
+        include: {
+          category: { select: { id: true, name: true, color: true, icon: true } },
+          paidBy: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { dueDate: 'asc' },
+      })
+      return { series, createdExpenses }
     })
 
     return res.status(201).json({ series, expenses: createdExpenses })
