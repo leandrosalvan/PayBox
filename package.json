@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "mcp:start": "tsx mcp/server.ts",
     "mcp:check": "tsx mcp/check.ts",
     "test": "vitest run",
@@ -22,19 +22,19 @@
   "license": "ISC",
   "type": "commonjs",
   "engines": {
-    "node": ">=20.0.0 <21.0.0"
+    "node": ">=20.9.0 <21.0.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@prisma/client": "^5.22.0",
+    "@serwist/next": "^9.5.12",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "lucide-react": "^1.21.0",
-    "next": "^14.2.35",
+    "next": "^16.3.1",
     "next-auth": "^4.24.15",
     "next-intl": "^4.13.0",
-    "next-pwa": "^5.6.0",
-    "nodemailer": "^7.0.13",
+    "nodemailer": "^9.0.5",
     "prisma": "5.22.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -49,12 +49,18 @@
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "autoprefixer": "^10.4.20",
-    "eslint": "^8.57.0",
-    "eslint-config-next": "^14.2.35",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.1",
     "postcss": "^8.4.49",
+    "serwist": "^9.5.12",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.22.4",
     "typescript": "^5.7.2",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "next-auth": {
+      "nodemailer": "9.0.5"
+    }
   }
 }
