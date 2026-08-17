@@ -1,5 +1,6 @@
 import type { PrecacheEntry, SerwistGlobalConfig } from 'serwist'
 import { NetworkOnly, Serwist } from 'serwist'
+import { shouldDeleteLegacyPwaCache } from './lib/pwa/cache-policy'
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -21,6 +22,18 @@ const serwist = new Serwist({
       handler: new NetworkOnly(),
     },
   ],
+})
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) =>
+      Promise.all(
+        cacheNames
+          .filter(shouldDeleteLegacyPwaCache)
+          .map((cacheName) => caches.delete(cacheName)),
+      ),
+    ),
+  )
 })
 
 serwist.addEventListeners()
