@@ -8,7 +8,6 @@ const withSerwist = require('@serwist/next').default({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
 }
 
 module.exports = withSerwist(nextConfig)
