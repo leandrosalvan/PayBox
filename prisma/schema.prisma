@@ -24,6 +24,7 @@ model User {
   expensesPaid       Expense[]       @relation("PaidBy")
   seriesCreated      ExpenseSeries[] @relation("SeriesCreatedBy")
   seriesDefaultPayer ExpenseSeries[] @relation("SeriesDefaultPayer")
+  mcpCredentials     McpCredential[]
 }
 
 model Account {
@@ -224,4 +225,21 @@ model McpAuditEvent {
   @@index([requestId])
   @@index([userId, createdAt])
   @@index([walletId, createdAt])
+}
+
+model McpCredential {
+  id           String    @id @default(cuid())
+  userId       String
+  name         String
+  tokenHash    String    @unique
+  tokenPrefix  String
+  scopesText   String    @default("read")
+  writeEnabled Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  revokedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
 }

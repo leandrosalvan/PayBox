@@ -26,11 +26,3 @@ services:
         sync: false
       - key: FROM_EMAIL
         sync: false
-      - key: PAYBOX_MCP_TOKEN
-        sync: false
-      - key: PAYBOX_MCP_USER_EMAIL
-        sync: false
-      - key: PAYBOX_MCP_SCOPES
-        value: read
-      - key: PAYBOX_MCP_WRITE_ENABLED
-        value: "false"
