@@ -99,7 +99,7 @@ A forma mais fácil é usar o **Blueprint** do Render com o arquivo `render.yaml
 > Antes do primeiro deploy com as tabelas MCP, faça backup verificado e revise o backfill de proprietários. Backup, `db push`, deploy, execução do backfill e alteração das variáveis de produção são ações separadas e não são executadas automaticamente neste fluxo de desenvolvimento.
 
 Deploy manual (alternativa):
-- **Build command:** `bash -c "npm install && sed -i 's/provider = \"sqlite\"/provider = \"postgresql\"/g' prisma/schema.prisma && npx prisma@5.22.0 generate && npx prisma@5.22.0 db push --accept-data-loss && npm run build"`
+- **Build command:** `bash -c "npm install && sed -i 's/provider = \"sqlite\"/provider = \"postgresql\"/g' prisma/schema.prisma && npx prisma@5.22.0 generate && npx prisma@5.22.0 db push && npm run build"`
 - **Start command:** `npm start`
 
 ## Compartilhamento de carteira
@@ -135,6 +135,8 @@ mcp\start-paybox-mcp.cmd
 ```
 
 Comece sempre com `PAYBOX_MCP_SCOPES=read` e `PAYBOX_MCP_WRITE_ENABLED=false`. As consultas são puras; mutações exigem escopo, trava habilitada, `Idempotency-Key` e auditoria. Exclusões exigem uma prévia separada e `confirmationId` de uso único.
+
+Use um `PAYBOX_MCP_TOKEN` aleatório com pelo menos 32 caracteres. O cliente aceita HTTP somente em loopback (`localhost`, `127.0.0.1` ou `::1`); conexões remotas exigem HTTPS e redirecionamentos são recusados para não encaminhar o token.
 
 O script `prisma/backfill-wallet-owners.ts` promove o membro mais antigo somente em carteiras sem proprietário. A execução local ou em produção precisa de revisão e autorização explícita; ele não faz parte do build.
 

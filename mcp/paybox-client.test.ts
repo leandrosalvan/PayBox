@@ -20,7 +20,11 @@ describe('cliente HTTP PayBox', () => {
     await client.request({ method: 'GET', path: '/api/internal/mcp/wallets' })
     expect(fetchMock).toHaveBeenCalledWith(
       new URL('https://paybox.example/api/internal/mcp/wallets'),
-      expect.objectContaining({ method: 'GET', headers: expect.objectContaining({ authorization: 'Bearer segredo' }) })
+      expect.objectContaining({
+        method: 'GET',
+        redirect: 'error',
+        headers: expect.objectContaining({ authorization: 'Bearer segredo' }),
+      })
     )
   })
 

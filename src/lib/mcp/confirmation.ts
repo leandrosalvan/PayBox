@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { prisma } from '@/lib/prisma'
 import { McpHttpError } from '@/lib/mcp/errors'
 import { hashMcpInput } from '@/lib/mcp/hash'
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 
 const CONFIRMATION_TTL_MS = 5 * 60 * 1000
 
@@ -76,27 +76,30 @@ export async function runWithMcpConfirmation<T>(
   },
   execute: (tx: Prisma.TransactionClient, confirmation: { previewText: string }) => Promise<T>
 ) {
-  return prisma.$transaction(async (tx) => {
-    const confirmation = await tx.mcpConfirmation.findUnique({ where: { id: options.confirmationId } })
-    const matches =
-      confirmation &&
-      confirmation.userId === options.userId &&
-      confirmation.walletId === options.walletId &&
-      confirmation.action === options.action &&
-      confirmation.target === options.target &&
-      confirmation.inputHash === hashMcpInput(options.input)
-    if (!matches) throw new McpHttpError(409, 'CONFLICT', 'Confirmação inválida')
-    if (confirmation.consumedAt) throw new McpHttpError(409, 'CONFLICT', 'Confirmação já utilizada')
-    if (confirmation.expiresAt.getTime() <= Date.now()) {
-      throw new McpHttpError(409, 'CONFLICT', 'Confirmação expirada')
-    }
-    const consumed = await tx.mcpConfirmation.updateMany({
-      where: { id: confirmation.id, consumedAt: null },
-      data: { consumedAt: new Date() },
-    })
-    if (consumed.count !== 1) throw new McpHttpError(409, 'CONFLICT', 'Confirmação já utilizada')
-    const result = await execute(tx, confirmation)
-    await tx.mcpConfirmation.update({ where: { id: confirmation.id }, data: { executedAt: new Date() } })
-    return result
-  })
+  return prisma.$transaction(
+    async (tx) => {
+      const confirmation = await tx.mcpConfirmation.findUnique({ where: { id: options.confirmationId } })
+      const matches =
+        confirmation &&
+        confirmation.userId === options.userId &&
+        confirmation.walletId === options.walletId &&
+        confirmation.action === options.action &&
+        confirmation.target === options.target &&
+        confirmation.inputHash === hashMcpInput(options.input)
+      if (!matches) throw new McpHttpError(409, 'CONFLICT', 'Confirmação inválida')
+      if (confirmation.consumedAt) throw new McpHttpError(409, 'CONFLICT', 'Confirmação já utilizada')
+      if (confirmation.expiresAt.getTime() <= Date.now()) {
+        throw new McpHttpError(409, 'CONFLICT', 'Confirmação expirada')
+      }
+      const consumed = await tx.mcpConfirmation.updateMany({
+        where: { id: confirmation.id, consumedAt: null },
+        data: { consumedAt: new Date() },
+      })
+      if (consumed.count !== 1) throw new McpHttpError(409, 'CONFLICT', 'Confirmação já utilizada')
+      const result = await execute(tx, confirmation)
+      await tx.mcpConfirmation.update({ where: { id: confirmation.id }, data: { executedAt: new Date() } })
+      return result
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+  )
 }

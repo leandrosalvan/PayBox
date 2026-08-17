@@ -47,7 +47,7 @@ export async function authenticateMcpRequest(
 ): Promise<McpIdentity> {
   const configuredToken = process.env.PAYBOX_MCP_TOKEN
   const configuredEmail = process.env.PAYBOX_MCP_USER_EMAIL?.trim().toLowerCase()
-  if (!configuredToken || !configuredEmail) {
+  if (!configuredToken || Buffer.byteLength(configuredToken, 'utf8') < 32 || !configuredEmail) {
     throw new McpHttpError(503, 'AUTH_CONFIGURATION_ERROR', 'MCP não configurado')
   }
 

@@ -44,6 +44,7 @@ export class PayboxClient {
     try {
       const response = await fetch(url, {
         method: request.method,
+        redirect: 'error',
         signal: controller.signal,
         headers: {
           authorization: `Bearer ${this.config.token}`,

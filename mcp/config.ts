@@ -1,13 +1,24 @@
 import { z } from 'zod'
 
+const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1'])
+const baseUrlSchema = z
+  .string()
+  .url()
+  .refine((value) => {
+    const url = new URL(value)
+    return url.protocol === 'https:' || (url.protocol === 'http:' && LOOPBACK_HOSTNAMES.has(url.hostname))
+  }, 'PAYBOX_BASE_URL deve usar HTTPS fora da máquina local')
+  .transform((value) => value.replace(/\/$/, ''))
+
 const configSchema = z.object({
-  baseUrl: z.string().url().transform((value) => value.replace(/\/$/, '')),
-  token: z.string().min(1),
+  baseUrl: baseUrlSchema,
+  token: z.string().min(32),
 })
 
 export type PayboxMcpConfig = z.infer<typeof configSchema>
+type McpEnvironment = { PAYBOX_BASE_URL?: string; PAYBOX_MCP_TOKEN?: string }
 
-export function loadMcpConfig(env: NodeJS.ProcessEnv = process.env): PayboxMcpConfig {
+export function loadMcpConfig(env: McpEnvironment = process.env as McpEnvironment): PayboxMcpConfig {
   const parsed = configSchema.safeParse({
     baseUrl: env.PAYBOX_BASE_URL || 'http://localhost:3000',
     token: env.PAYBOX_MCP_TOKEN,
@@ -18,8 +29,9 @@ export function loadMcpConfig(env: NodeJS.ProcessEnv = process.env): PayboxMcpCo
   return parsed.data
 }
 
-export function checkMcpConfig(env: NodeJS.ProcessEnv = process.env) {
-  const baseUrl = z.string().url().safeParse(env.PAYBOX_BASE_URL || 'http://localhost:3000')
+export function checkMcpConfig(env: McpEnvironment = process.env as McpEnvironment) {
+  const baseUrl = baseUrlSchema.safeParse(env.PAYBOX_BASE_URL || 'http://localhost:3000')
   if (!baseUrl.success) throw new Error('PAYBOX_BASE_URL inválida')
-  return { baseUrl: baseUrl.data, hasToken: Boolean(env.PAYBOX_MCP_TOKEN) }
+  const token = z.string().min(32).safeParse(env.PAYBOX_MCP_TOKEN)
+  return { baseUrl: baseUrl.data, hasToken: token.success }
 }
