@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { formatCurrency, formatDate, formatMonthYear, t, SupportedLocale, SupportedCurrency } from '@/lib/locales'
 import { cn } from '@/lib/utils'
+import { expenseMutationError, setExpensePaymentWithConflictRetry } from '@/lib/expense-payment'
 import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Wallet } from 'lucide-react'
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
@@ -23,6 +24,8 @@ export default function WalletHome() {
   const [wallet, setWallet] = useState<any>(null)
   const [expenses, setExpenses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [payingExpenseId, setPayingExpenseId] = useState<string | null>(null)
+  const [mutationError, setMutationError] = useState('')
   const [currentDate, setCurrentDate] = useState(new Date())
 
   const monthKey = useMemo(() => {
@@ -51,15 +54,22 @@ export default function WalletHome() {
   }, [walletId, session, fetchWallet, fetchExpenses])
 
   async function togglePay(expense: any) {
-    const res = await fetch(`/api/wallets/${walletId}/expenses/${expense.id}/pay`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    setMutationError('')
+    setPayingExpenseId(expense.id)
+    try {
+      const res = await setExpensePaymentWithConflictRetry({
+        walletId: String(walletId),
+        expenseId: expense.id,
         status: expense.status === 'paid' ? 'pending' : 'paid',
         expectedUpdatedAt: expense.updatedAt,
-      }),
-    })
-    if (res.ok) fetchExpenses()
+      })
+      if (res.ok) await fetchExpenses()
+      else setMutationError(await expenseMutationError(res, 'Não foi possível atualizar a conta'))
+    } catch {
+      setMutationError('Não foi possível conectar ao servidor. Tente novamente.')
+    } finally {
+      setPayingExpenseId(null)
+    }
   }
 
   function changeMonth(offset: number) {
@@ -109,6 +119,8 @@ export default function WalletHome() {
             <ChevronRight size={20} />
           </button>
         </div>
+
+        {mutationError && <p className="mb-4 rounded-lg bg-red-500/15 p-3 text-sm text-red-300">{mutationError}</p>}
 
         <div className="mb-4 grid grid-cols-3 gap-2">
           <Card className="text-center">
@@ -160,13 +172,14 @@ export default function WalletHome() {
                   <div className="text-right">
                     <p className="font-semibold">{formatCurrency(expense.amount, currency, locale)}</p>
                     <button
+                      disabled={payingExpenseId === expense.id}
                       onClick={(e) => {
                         e.stopPropagation()
                         togglePay(expense)
                       }}
-                      className={`text-xs ${expense.status === 'paid' ? 'text-primary-400' : 'text-slate-400'}`}
+                      className={`text-xs disabled:cursor-wait disabled:opacity-60 ${expense.status === 'paid' ? 'text-primary-400' : 'text-slate-400'}`}
                     >
-                      {expense.status === 'paid' ? t(locale, 'paid') : t(locale, 'pending')}
+                      {payingExpenseId === expense.id ? 'Atualizando...' : expense.status === 'paid' ? t(locale, 'paid') : t(locale, 'pending')}
                     </button>
                   </div>
                 </div>

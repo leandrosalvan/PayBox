@@ -9,6 +9,7 @@ import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
 import { t, SupportedLocale, SupportedCurrency, formatCurrency, toDateInputValue } from '@/lib/locales'
 import { floatToCents } from '@/lib/utils'
+import { expenseMutationError, setExpensePaymentWithConflictRetry } from '@/lib/expense-payment'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
@@ -80,23 +81,38 @@ export default function ExpenseDetail() {
     if (res.ok) {
       router.push(`/wallets/${walletId}`)
     } else {
-      const data = await res.json()
-      setError(data.error || 'Erro ao salvar')
+      if (res.status === 409) {
+        const latestRes = await fetch(`/api/wallets/${walletId}/expenses/${expenseId}`)
+        if (latestRes.ok) {
+          const latest = await latestRes.json()
+          setExpense((current: any) => ({ ...current, status: latest.status, updatedAt: latest.updatedAt }))
+        }
+        setError('Esta conta foi atualizada. Confira os dados e clique em Salvar novamente.')
+      } else {
+        setError(await expenseMutationError(res, 'Erro ao salvar'))
+      }
     }
     setLoading(false)
   }
 
   async function handlePay() {
-    const res = await fetch(`/api/wallets/${walletId}/expenses/${expenseId}/pay`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    setError('')
+    setLoading(true)
+    try {
+      const res = await setExpensePaymentWithConflictRetry({
+        walletId: String(walletId),
+        expenseId: String(expenseId),
         paidById,
         status: expense.status === 'paid' ? 'pending' : 'paid',
         expectedUpdatedAt: expense.updatedAt,
-      }),
-    })
-    if (res.ok) fetchData()
+      })
+      if (res.ok) await fetchData()
+      else setError(await expenseMutationError(res, 'Não foi possível atualizar o pagamento'))
+    } catch {
+      setError('Não foi possível conectar ao servidor. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleAction(action: string, body: any = {}) {
@@ -166,7 +182,7 @@ export default function ExpenseDetail() {
             <Button type="submit" className="flex-1" isLoading={loading}>
               {t(locale, 'save')}
             </Button>
-            <Button type="button" variant={expense.status === 'paid' ? 'secondary' : 'primary'} className="flex-1" onClick={handlePay}>
+            <Button type="button" variant={expense.status === 'paid' ? 'secondary' : 'primary'} className="flex-1" onClick={handlePay} isLoading={loading}>
               {expense.status === 'paid' ? t(locale, 'pending') : t(locale, 'paid')}
             </Button>
           </div>
