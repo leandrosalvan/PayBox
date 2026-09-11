@@ -24,7 +24,7 @@ export default function WalletHome() {
   const [wallet, setWallet] = useState<any>(null)
   const [expenses, setExpenses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [payingExpenseId, setPayingExpenseId] = useState<string | null>(null)
+  const [payingExpenseIds, setPayingExpenseIds] = useState<Set<string>>(() => new Set())
   const [mutationError, setMutationError] = useState('')
   const [currentDate, setCurrentDate] = useState(new Date())
 
@@ -39,23 +39,27 @@ export default function WalletHome() {
 
   const fetchExpenses = useCallback(async () => {
     setLoading(true)
-    const res = await fetch(`/api/wallets/${walletId}/expenses?month=${monthKey}`)
-    if (res.ok) {
+    try {
+      const res = await fetch(`/api/wallets/${walletId}/expenses?month=${monthKey}`)
+      if (!res.ok) throw new Error('Não foi possível atualizar a lista de contas.')
       const data = await res.json()
       setExpenses(data.expenses)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [monthKey, walletId])
 
   useEffect(() => {
     if (!walletId || typeof walletId !== 'string' || !session) return
     fetchWallet()
-    fetchExpenses()
+    void fetchExpenses().catch(() => {
+      setMutationError('Não foi possível carregar as contas. Tente novamente.')
+    })
   }, [walletId, session, fetchWallet, fetchExpenses])
 
   async function togglePay(expense: any) {
     setMutationError('')
-    setPayingExpenseId(expense.id)
+    setPayingExpenseIds((current) => new Set(current).add(expense.id))
     try {
       const res = await setExpensePaymentWithConflictRetry({
         walletId: String(walletId),
@@ -65,10 +69,14 @@ export default function WalletHome() {
       })
       if (res.ok) await fetchExpenses()
       else setMutationError(await expenseMutationError(res, 'Não foi possível atualizar a conta'))
-    } catch {
-      setMutationError('Não foi possível conectar ao servidor. Tente novamente.')
+    } catch (error) {
+      setMutationError(error instanceof Error ? error.message : 'Não foi possível conectar ao servidor. Tente novamente.')
     } finally {
-      setPayingExpenseId(null)
+      setPayingExpenseIds((current) => {
+        const next = new Set(current)
+        next.delete(expense.id)
+        return next
+      })
     }
   }
 
@@ -172,14 +180,14 @@ export default function WalletHome() {
                   <div className="text-right">
                     <p className="font-semibold">{formatCurrency(expense.amount, currency, locale)}</p>
                     <button
-                      disabled={payingExpenseId === expense.id}
+                      disabled={payingExpenseIds.has(expense.id)}
                       onClick={(e) => {
                         e.stopPropagation()
                         togglePay(expense)
                       }}
                       className={`text-xs disabled:cursor-wait disabled:opacity-60 ${expense.status === 'paid' ? 'text-primary-400' : 'text-slate-400'}`}
                     >
-                      {payingExpenseId === expense.id ? 'Atualizando...' : expense.status === 'paid' ? t(locale, 'paid') : t(locale, 'pending')}
+                      {payingExpenseIds.has(expense.id) ? 'Atualizando...' : expense.status === 'paid' ? t(locale, 'paid') : t(locale, 'pending')}
                     </button>
                   </div>
                 </div>

@@ -33,6 +33,7 @@ export default function ExpenseDetail() {
   const [paidById, setPaidById] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [saveBlocked, setSaveBlocked] = useState(false)
   const [convertInstallments, setConvertInstallments] = useState('2')
 
   const fetchData = useCallback(async () => {
@@ -54,6 +55,7 @@ export default function ExpenseDetail() {
       setDueDate(toDateInputValue(new Date(e.dueDate)))
       setCategoryId(e.categoryId || '')
       setPaidById(e.paidById || '')
+      setSaveBlocked(false)
     }
   }, [expenseId, walletId])
 
@@ -64,35 +66,48 @@ export default function ExpenseDetail() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
+    if (saveBlocked) {
+      setError('Atualize a página antes de tentar salvar novamente.')
+      return
+    }
     const amountCents = floatToCents(parseFloat(amount.replace(',', '.')))
+    setError('')
     setLoading(true)
-    const res = await fetch(`/api/wallets/${walletId}/expenses/${expenseId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        description,
-        amount: amountCents,
-        dueDate,
-        categoryId,
-        paidById,
-        expectedUpdatedAt: expense.updatedAt,
-      }),
-    })
-    if (res.ok) {
-      router.push(`/wallets/${walletId}`)
-    } else {
+    try {
+      const res = await fetch(`/api/wallets/${walletId}/expenses/${expenseId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description,
+          amount: amountCents,
+          dueDate,
+          categoryId,
+          paidById,
+          expectedUpdatedAt: expense.updatedAt,
+        }),
+      })
+      if (res.ok) {
+        router.push(`/wallets/${walletId}`)
+        return
+      }
+
       if (res.status === 409) {
+        setSaveBlocked(true)
         const latestRes = await fetch(`/api/wallets/${walletId}/expenses/${expenseId}`)
-        if (latestRes.ok) {
-          const latest = await latestRes.json()
-          setExpense((current: any) => ({ ...current, status: latest.status, updatedAt: latest.updatedAt }))
-        }
+        if (!latestRes.ok) throw new Error('Não foi possível obter a versão atual da conta. Atualize a página.')
+        const latest = await latestRes.json()
+        if (typeof latest.updatedAt !== 'string') throw new Error('A versão atual da conta é inválida. Atualize a página.')
+        setExpense((current: any) => ({ ...current, status: latest.status, updatedAt: latest.updatedAt }))
+        setSaveBlocked(false)
         setError('Esta conta foi atualizada. Confira os dados e clique em Salvar novamente.')
       } else {
         setError(await expenseMutationError(res, 'Erro ao salvar'))
       }
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Não foi possível salvar a conta. Atualize a página.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   async function handlePay() {
@@ -179,7 +194,7 @@ export default function ExpenseDetail() {
           />
           {error && <p className="text-sm text-red-400">{error}</p>}
           <div className="flex gap-2">
-            <Button type="submit" className="flex-1" isLoading={loading}>
+            <Button type="submit" className="flex-1" isLoading={loading} disabled={saveBlocked}>
               {t(locale, 'save')}
             </Button>
             <Button type="button" variant={expense.status === 'paid' ? 'secondary' : 'primary'} className="flex-1" onClick={handlePay} isLoading={loading}>

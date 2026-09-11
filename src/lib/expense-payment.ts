@@ -36,7 +36,9 @@ export async function setExpensePaymentWithConflictRetry({
   if (!latestResponse.ok) return firstResponse
 
   const latestExpense = await latestResponse.json()
-  if (latestExpense.status === status) return latestResponse
+  const requestedPaymentIsCurrent = latestExpense.status === status
+    && (!paidById || latestExpense.paidById === paidById)
+  if (requestedPaymentIsCurrent) return latestResponse
   if (typeof latestExpense.updatedAt !== 'string') return firstResponse
 
   return submit(latestExpense.updatedAt)

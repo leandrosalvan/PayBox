@@ -66,4 +66,32 @@ describe('setExpensePaymentWithConflictRetry', () => {
     expect(response.status).toBe(200)
     expect(fetcher).toHaveBeenCalledTimes(2)
   })
+
+  it('retries when the status matches but the requested payer does not', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(expense(409, { error: 'Conflito' }))
+      .mockResolvedValueOnce(expense(200, {
+        status: 'paid',
+        paidById: 'user-2',
+        updatedAt: '2026-09-10T13:00:00.000Z',
+      }))
+      .mockResolvedValueOnce(expense(200, { status: 'paid', paidById: 'user-1' }))
+
+    const response = await setExpensePaymentWithConflictRetry({
+      walletId: 'wallet-1',
+      expenseId: 'expense-1',
+      status: 'paid',
+      paidById: 'user-1',
+      expectedUpdatedAt: '2026-09-10T12:00:00.000Z',
+      fetcher,
+    })
+
+    expect(response.status).toBe(200)
+    expect(fetcher).toHaveBeenCalledTimes(3)
+    expect(JSON.parse(fetcher.mock.calls[2][1].body)).toMatchObject({
+      status: 'paid',
+      paidById: 'user-1',
+      expectedUpdatedAt: '2026-09-10T13:00:00.000Z',
+    })
+  })
 })
