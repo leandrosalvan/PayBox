@@ -25,7 +25,10 @@ export default function NewExpense() {
   const [categories, setCategories] = useState<any[]>([])
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
-  const [dueDate, setDueDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [dueDate, setDueDate] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  })
   const [categoryId, setCategoryId] = useState('')
   const [type, setType] = useState('single')
   const [installments, setInstallments] = useState('2')
@@ -56,7 +59,7 @@ export default function NewExpense() {
       body: JSON.stringify({
         description,
         amount: amountCents,
-        dueDay: new Date(dueDate + 'T00:00:00').getDate(),
+        dueDay: Number(dueDate.split('-')[2]),
         dueDate,
         categoryId: categoryId || null,
         type,

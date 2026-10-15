@@ -39,7 +39,7 @@ export function generateSeriesInstances(
       paidById: baseValues.paidById || null,
       createdById: baseValues.createdById,
     })
-    currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)
+    currentDate = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() + 1, 1))
   }
   return instances
 }
@@ -50,7 +50,7 @@ export async function renewFixedSeriesIfNeeded(walletId: string) {
   })
 
   const now = new Date()
-  const threeMonthsFromNow = new Date(now.getFullYear(), now.getMonth() + 3, 1)
+  const threeMonthsFromNow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 3, 1))
 
   for (const series of fixedSeries) {
     if (!series.endDate) continue
@@ -60,8 +60,8 @@ export async function renewFixedSeriesIfNeeded(walletId: string) {
         orderBy: { dueDate: 'desc' },
       })
       if (!lastExpense) continue
-      const nextDate = new Date(lastExpense.dueDate.getFullYear(), lastExpense.dueDate.getMonth() + 1, 1)
-      const newEndDate = new Date(series.endDate.getFullYear(), series.endDate.getMonth() + 12, 1)
+      const nextDate = new Date(Date.UTC(lastExpense.dueDate.getUTCFullYear(), lastExpense.dueDate.getUTCMonth() + 1, 1))
+      const newEndDate = new Date(Date.UTC(series.endDate.getUTCFullYear(), series.endDate.getUTCMonth() + 12, 1))
       const count = 12
       const instances = generateSeriesInstances(
         walletId,
@@ -89,7 +89,7 @@ export async function renewFixedSeriesIfNeeded(walletId: string) {
 
 export async function updateOverdueStatus(walletId: string) {
   const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  today.setUTCHours(0, 0, 0, 0)
   await prisma.expense.updateMany({
     where: {
       walletId,
@@ -106,7 +106,7 @@ export function parseMonth(monthString: string) {
 }
 
 export function getMonthRange(year: number, month: number) {
-  const start = new Date(year, month, 1, 0, 0, 0, 0)
-  const end = new Date(year, month + 1, 0, 23, 59, 59, 999)
+  const start = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0))
+  const end = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999))
   return { start, end }
 }

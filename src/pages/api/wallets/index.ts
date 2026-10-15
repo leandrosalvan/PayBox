@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { defaultCurrency, defaultLocale } from '@/lib/locales'
+import { getMonthRange } from '@/lib/expenses'
 import { createWalletCommand } from '@/server/paybox/wallet-commands'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -16,7 +17,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
       orderBy: { joinedAt: 'desc' },
     })
-    return res.status(200).json({ wallets: memberships.map((m: any) => m.wallet) })
+    const wallets = memberships.map((m: any) => m.wallet)
+
+    // Resumo do mês corrente de cada carteira (atrasado = não pago com vencimento anterior a hoje).
+    const now = new Date()
+    const { start, end } = getMonthRange(now.getUTCFullYear(), now.getUTCMonth())
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+    const monthExpenses = await prisma.expense.findMany({
+      where: { walletId: { in: wallets.map((w: any) => w.id) }, dueDate: { gte: start, lte: end } },
+      select: { walletId: true, amount: true, status: true, dueDate: true },
+    })
+    const summaries = new Map<string, { paid: number; pending: number; overdue: number; overdueCount: number }>()
+    for (const e of monthExpenses) {
+      const summary = summaries.get(e.walletId) ?? { paid: 0, pending: 0, overdue: 0, overdueCount: 0 }
+      if (e.status === 'paid') summary.paid += e.amount
+      else if (e.dueDate < today) {
+        summary.overdue += e.amount
+        summary.overdueCount += 1
+      } else summary.pending += e.amount
+      summaries.set(e.walletId, summary)
+    }
+
+    return res.status(200).json({
+      wallets: wallets.map((w: any) => ({
+        ...w,
+        summary: summaries.get(w.id) ?? { paid: 0, pending: 0, overdue: 0, overdueCount: 0 },
+      })),
+    })
   }
 
   if (req.method === 'POST') {

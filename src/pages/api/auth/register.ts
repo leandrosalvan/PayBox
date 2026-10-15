@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/auth'
+import { findUserByEmail, normalizeEmail } from '@/lib/user-lookup'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -12,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Dados inválidos' })
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } })
+    const existing = await findUserByEmail(email)
     if (existing) {
       return res.status(400).json({ error: 'E-mail já cadastrado' })
     }
@@ -21,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const user = await prisma.user.create({
       data: {
-        email,
+        email: normalizeEmail(email),
         password: hashed,
         name: name || null,
       },

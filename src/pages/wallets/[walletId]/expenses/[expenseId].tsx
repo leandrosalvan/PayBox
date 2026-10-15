@@ -7,9 +7,9 @@ import AppLayout from '@/components/layout/AppLayout'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
-import { t, SupportedLocale, SupportedCurrency, formatCurrency, toDateInputValue } from '@/lib/locales'
+import { t, SupportedLocale, SupportedCurrency, formatCurrency, toDateInputValue, paidLabel } from '@/lib/locales'
 import { floatToCents } from '@/lib/utils'
-import { expenseMutationError, setExpensePaymentWithConflictRetry } from '@/lib/expense-payment'
+import { expenseMutationError } from '@/lib/expense-payment'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
@@ -24,13 +24,11 @@ export default function ExpenseDetail() {
   const { walletId, expenseId } = router.query
   const [wallet, setWallet] = useState<any>(null)
   const [expense, setExpense] = useState<any>(null)
-  const [members, setMembers] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [categoryId, setCategoryId] = useState('')
-  const [paidById, setPaidById] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [saveBlocked, setSaveBlocked] = useState(false)
@@ -44,7 +42,6 @@ export default function ExpenseDetail() {
     if (walletRes.ok) {
       const w = await walletRes.json()
       setWallet(w)
-      setMembers(w.members)
       setCategories(w.categories)
     }
     if (expenseRes.ok) {
@@ -54,7 +51,6 @@ export default function ExpenseDetail() {
       setAmount((e.amount / 100).toFixed(2).replace('.', ','))
       setDueDate(toDateInputValue(new Date(e.dueDate)))
       setCategoryId(e.categoryId || '')
-      setPaidById(e.paidById || '')
       setSaveBlocked(false)
     }
   }, [expenseId, walletId])
@@ -82,7 +78,6 @@ export default function ExpenseDetail() {
           amount: amountCents,
           dueDate,
           categoryId,
-          paidById,
           expectedUpdatedAt: expense.updatedAt,
         }),
       })
@@ -105,26 +100,6 @@ export default function ExpenseDetail() {
       }
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Não foi possível salvar a conta. Atualize a página.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handlePay() {
-    setError('')
-    setLoading(true)
-    try {
-      const res = await setExpensePaymentWithConflictRetry({
-        walletId: String(walletId),
-        expenseId: String(expenseId),
-        paidById,
-        status: expense.status === 'paid' ? 'pending' : 'paid',
-        expectedUpdatedAt: expense.updatedAt,
-      })
-      if (res.ok) await fetchData()
-      else setError(await expenseMutationError(res, 'Não foi possível atualizar o pagamento'))
-    } catch {
-      setError('Não foi possível conectar ao servidor. Tente novamente.')
     } finally {
       setLoading(false)
     }
@@ -173,7 +148,7 @@ export default function ExpenseDetail() {
         </div>
         <h1 className="mb-2 text-2xl font-bold">{expense.description}</h1>
         <p className={`mb-4 text-sm font-medium ${expense.status === 'paid' ? 'text-primary-400' : expense.status === 'overdue' ? 'text-red-400' : 'text-slate-400'}`}>
-          {expense.status === 'paid' ? t(locale, 'paid') : expense.status === 'overdue' ? t(locale, 'overdue') : t(locale, 'pending')} · {formatCurrency(expense.amount, currency, locale)}
+          {expense.status === 'paid' ? paidLabel(expense, locale) : expense.status === 'overdue' ? t(locale, 'overdue') : t(locale, 'pending')} · {formatCurrency(expense.amount, currency, locale)}
         </p>
 
         <form onSubmit={handleSave} className="space-y-4">
@@ -186,21 +161,10 @@ export default function ExpenseDetail() {
             onChange={(e: ChangeEvent<HTMLSelectElement>) => setCategoryId(e.target.value)}
           />
           <Input type="date" label={t(locale, 'dueDate')} value={dueDate} onChange={(e: ChangeEvent<HTMLInputElement>) => setDueDate(e.target.value)} required />
-          <Select
-            label={t(locale, 'whoPaid')}
-            options={members.map((m) => ({ value: m.userId, label: m.user.name || m.user.email }))}
-            value={paidById}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) => setPaidById(e.target.value)}
-          />
           {error && <p className="text-sm text-red-400">{error}</p>}
-          <div className="flex gap-2">
-            <Button type="submit" className="flex-1" isLoading={loading} disabled={saveBlocked}>
-              {t(locale, 'save')}
-            </Button>
-            <Button type="button" variant={expense.status === 'paid' ? 'secondary' : 'primary'} className="flex-1" onClick={handlePay} isLoading={loading}>
-              {expense.status === 'paid' ? t(locale, 'pending') : t(locale, 'paid')}
-            </Button>
-          </div>
+          <Button type="submit" className="w-full" isLoading={loading} disabled={saveBlocked}>
+            {t(locale, 'save')}
+          </Button>
         </form>
 
         {isSeries && (

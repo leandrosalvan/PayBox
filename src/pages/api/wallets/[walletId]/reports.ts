@@ -20,8 +20,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'GET') return res.status(405).end()
 
   const { month } = req.query
-  let year = new Date().getFullYear()
-  let monthIndex = new Date().getMonth()
+  let year = new Date().getUTCFullYear()
+  let monthIndex = new Date().getUTCMonth()
   if (typeof month === 'string') {
     const parsed = parseMonth(month)
     year = parsed.year
@@ -60,13 +60,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const evolution = []
   for (let i = 5; i >= 0; i--) {
-    const d = new Date(year, monthIndex - i, 1)
-    const { start: s, end: e } = getMonthRange(d.getFullYear(), d.getMonth())
+    const d = new Date(Date.UTC(year, monthIndex - i, 1))
+    const { start: s, end: e } = getMonthRange(d.getUTCFullYear(), d.getUTCMonth())
     const monthExpenses = await prisma.expense.findMany({
       where: { walletId, dueDate: { gte: s, lte: e } },
     })
     evolution.push({
-      month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      month: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`,
       paid: monthExpenses.filter((x: any) => x.status === 'paid').reduce((sum: number, x: any) => sum + x.amount, 0),
       pending: monthExpenses.filter((x: any) => x.status === 'pending').reduce((sum: number, x: any) => sum + x.amount, 0),
       overdue: monthExpenses.filter((x: any) => x.status === 'overdue').reduce((sum: number, x: any) => sum + x.amount, 0),

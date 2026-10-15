@@ -11,11 +11,16 @@ import {
   positiveCentsSchema,
 } from '@/lib/mcp/schemas'
 
+// 'individual' é o nome antigo de 'separate'; segue aceito para clientes existentes.
+const salaryModeSchema = z
+  .enum(['joint', 'separate', 'individual'])
+  .transform((value) => (value === 'individual' ? 'separate' : value))
+
 export const createWalletSchema = z.object({
   name: z.string().trim().min(1).max(100),
   locale: localeSchema.default('pt-BR'),
   currency: currencySchema.default('BRL'),
-  salaryMode: z.enum(['joint', 'individual']).default('joint'),
+  salaryMode: salaryModeSchema.default('joint'),
 })
 
 export const updateWalletSchema = z.object({
@@ -24,7 +29,7 @@ export const updateWalletSchema = z.object({
     name: z.string().trim().min(1).max(100).optional(),
     locale: localeSchema.optional(),
     currency: currencySchema.optional(),
-    salaryMode: z.enum(['joint', 'individual']).optional(),
+    salaryMode: salaryModeSchema.optional(),
   }).refine((value) => Object.keys(value).length > 0),
   expectedUpdatedAt: isoInstantSchema,
 })

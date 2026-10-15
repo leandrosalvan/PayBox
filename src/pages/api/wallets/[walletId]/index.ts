@@ -33,6 +33,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (membership.role !== 'owner') return res.status(403).json({ error: 'Apenas o proprietário pode editar a carteira' })
     const { name, locale, currency, salaryMode, expectedUpdatedAt } = req.body
     if (typeof expectedUpdatedAt !== 'string') return res.status(400).json({ error: 'Versão da carteira obrigatória' })
+    if (salaryMode !== undefined && salaryMode !== 'joint' && salaryMode !== 'separate') {
+      return res.status(400).json({ error: 'Modo de salários inválido' })
+    }
     const changed = await prisma.wallet.updateMany({
       where: { id: walletId, updatedAt: new Date(expectedUpdatedAt) },
       data: { name, locale, currency, salaryMode },

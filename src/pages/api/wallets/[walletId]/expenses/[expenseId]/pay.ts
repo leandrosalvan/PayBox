@@ -21,7 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { paidById, status, expectedUpdatedAt, paidAt } = req.body
+  const { status, expectedUpdatedAt, paidAt } = req.body
   if ((status !== 'paid' && status !== 'pending') || typeof expectedUpdatedAt !== 'string') {
     return res.status(400).json({ error: 'Estado de pagamento e versão são obrigatórios' })
   }
@@ -30,11 +30,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!expense) return res.status(404).json({ error: 'Despesa não encontrada' })
 
   try {
+    // Quem opera detém a informação: quem marca como pago é registrado como o pagador.
     const updated = await setExpensePaymentCommand(userId, {
       walletId,
       expenseId,
       status,
-      paidById: paidById || expense.paidById || undefined,
+      paidById: userId,
       paidAt,
       expectedUpdatedAt,
     })

@@ -25,15 +25,29 @@ export function formatCurrency(amount: number, currency: SupportedCurrency, loca
 }
 
 export function formatDate(date: string | Date, locale: SupportedLocale) {
-  return new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(date))
+  return new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).format(new Date(date))
+}
+
+export function formatDayMonth(date: string | Date, locale: SupportedLocale) {
+  return new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit' }).format(new Date(date))
+}
+
+export function paidLabel(
+  expense: { paidAt?: string | Date | null; paidBy?: { name?: string | null; email?: string | null } | null },
+  locale: SupportedLocale
+) {
+  const date = expense.paidAt ? `${t(locale, 'paidOn')} ${formatDayMonth(expense.paidAt, locale)}` : t(locale, 'paid')
+  const payer = expense.paidBy?.name || expense.paidBy?.email
+  return payer ? `${date} ${t(locale, 'paidBy')} ${payer}` : date
 }
 
 export function formatMonthYear(date: string | Date, locale: SupportedLocale) {
-  return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(new Date(date))
+  return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(date))
 }
 
+// Datas de vencimento são datas civis guardadas como meia-noite UTC.
 export function parseDateInput(dateString: string) {
-  return new Date(dateString + 'T00:00:00')
+  return new Date(dateString + 'T00:00:00.000Z')
 }
 
 export function toDateInputValue(date: Date) {
@@ -59,10 +73,12 @@ export function addMonths(date: Date, months: number) {
 }
 
 export function setDueDay(date: Date, day: number) {
-  const d = new Date(date.getFullYear(), date.getMonth(), day)
+  const year = date.getUTCFullYear()
+  const month = date.getUTCMonth()
+  const d = new Date(Date.UTC(year, month, day))
   // Se o dia não existe (ex: 31 de fevereiro), volta para o último dia do mês
-  if (d.getMonth() !== date.getMonth()) {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0)
+  if (d.getUTCMonth() !== month) {
+    return new Date(Date.UTC(year, month + 1, 0))
   }
   return d
 }
@@ -105,6 +121,11 @@ const translations: Record<SupportedLocale, Record<string, string>> = {
     category: 'Categoria',
     dueDate: 'Vencimento',
     paid: 'Pago',
+    paidOn: 'Pago em',
+    paidBy: 'por',
+    undoPayment: 'Desfazer pagamento',
+    markAsPaid: 'Marcar como pago',
+    undoPaymentConfirm: 'Desfazer o pagamento? A despesa volta para em aberto ou atrasada.',
     pending: 'Pendente',
     overdue: 'Atrasado',
     whoPaid: 'Quem pagou',
@@ -121,9 +142,13 @@ const translations: Record<SupportedLocale, Record<string, string>> = {
     deleteAll: 'Excluir toda a série',
     reports: 'Relatórios',
     dashboard: 'Dashboard',
-    totalPaid: 'Total pago',
-    totalPending: 'Total pendente',
-    totalOverdue: 'Total atrasado',
+    totalExpenses: 'Total do mês',
+    totalPaid: 'Pago',
+    totalPending: 'A pagar',
+    totalOverdue: 'Em atraso',
+    monthIncome: 'Renda do mês',
+    monthLeftover: 'Sobra do mês',
+    paidByMember: 'Pagou',
     byCategory: 'Por categoria',
     monthlyEvolution: 'Evolução mensal',
     settings: 'Configurações',
@@ -168,6 +193,11 @@ const translations: Record<SupportedLocale, Record<string, string>> = {
     category: 'Category',
     dueDate: 'Due date',
     paid: 'Paid',
+    paidOn: 'Paid on',
+    paidBy: 'by',
+    undoPayment: 'Undo payment',
+    markAsPaid: 'Mark as paid',
+    undoPaymentConfirm: 'Undo this payment? The expense goes back to open or overdue.',
     pending: 'Pending',
     overdue: 'Overdue',
     whoPaid: 'Who paid',
@@ -184,9 +214,13 @@ const translations: Record<SupportedLocale, Record<string, string>> = {
     deleteAll: 'Delete entire series',
     reports: 'Reports',
     dashboard: 'Dashboard',
-    totalPaid: 'Total paid',
-    totalPending: 'Total pending',
-    totalOverdue: 'Total overdue',
+    totalExpenses: 'Month total',
+    totalPaid: 'Paid',
+    totalPending: 'To pay',
+    totalOverdue: 'Overdue',
+    monthIncome: 'Monthly income',
+    monthLeftover: 'Left over',
+    paidByMember: 'Paid',
     byCategory: 'By category',
     monthlyEvolution: 'Monthly evolution',
     settings: 'Settings',
@@ -231,6 +265,11 @@ const translations: Record<SupportedLocale, Record<string, string>> = {
     category: 'Categoría',
     dueDate: 'Vencimiento',
     paid: 'Pagado',
+    paidOn: 'Pagado el',
+    paidBy: 'por',
+    undoPayment: 'Deshacer pago',
+    markAsPaid: 'Marcar como pagado',
+    undoPaymentConfirm: '¿Deshacer el pago? El gasto vuelve a pendiente o atrasado.',
     pending: 'Pendiente',
     overdue: 'Atrasado',
     whoPaid: 'Quién pagó',
@@ -247,9 +286,13 @@ const translations: Record<SupportedLocale, Record<string, string>> = {
     deleteAll: 'Eliminar toda la serie',
     reports: 'Informes',
     dashboard: 'Panel',
-    totalPaid: 'Total pagado',
-    totalPending: 'Total pendiente',
-    totalOverdue: 'Total atrasado',
+    totalExpenses: 'Total del mes',
+    totalPaid: 'Pagado',
+    totalPending: 'Por pagar',
+    totalOverdue: 'Atrasado',
+    monthIncome: 'Ingresos del mes',
+    monthLeftover: 'Sobrante del mes',
+    paidByMember: 'Pagó',
     byCategory: 'Por categoría',
     monthlyEvolution: 'Evolución mensual',
     settings: 'Configuración',
@@ -294,6 +337,11 @@ const translations: Record<SupportedLocale, Record<string, string>> = {
     category: 'Catégorie',
     dueDate: 'Échéance',
     paid: 'Payé',
+    paidOn: 'Payé le',
+    paidBy: 'par',
+    undoPayment: 'Annuler le paiement',
+    markAsPaid: 'Marquer comme payé',
+    undoPaymentConfirm: 'Annuler le paiement ? La dépense redevient en attente ou en retard.',
     pending: 'En attente',
     overdue: 'En retard',
     whoPaid: 'Qui a payé',
@@ -310,9 +358,13 @@ const translations: Record<SupportedLocale, Record<string, string>> = {
     deleteAll: 'Supprimer toute la série',
     reports: 'Rapports',
     dashboard: 'Tableau de bord',
-    totalPaid: 'Total payé',
-    totalPending: 'Total en attente',
-    totalOverdue: 'Total en retard',
+    totalExpenses: 'Total du mois',
+    totalPaid: 'Payé',
+    totalPending: 'À payer',
+    totalOverdue: 'En retard',
+    monthIncome: 'Revenus du mois',
+    monthLeftover: 'Reste du mois',
+    paidByMember: 'A payé',
     byCategory: 'Par catégorie',
     monthlyEvolution: 'Évolution mensuelle',
     settings: 'Paramètres',
@@ -357,6 +409,11 @@ const translations: Record<SupportedLocale, Record<string, string>> = {
     category: 'Categoria',
     dueDate: 'Scadenza',
     paid: 'Pagato',
+    paidOn: 'Pagato il',
+    paidBy: 'da',
+    undoPayment: 'Annulla pagamento',
+    markAsPaid: 'Segna come pagato',
+    undoPaymentConfirm: 'Annullare il pagamento? La spesa torna in attesa o in ritardo.',
     pending: 'In attesa',
     overdue: 'In ritardo',
     whoPaid: 'Chi ha pagato',
@@ -373,9 +430,13 @@ const translations: Record<SupportedLocale, Record<string, string>> = {
     deleteAll: 'Elimina tutta la serie',
     reports: 'Rapporti',
     dashboard: 'Dashboard',
-    totalPaid: 'Totale pagato',
-    totalPending: 'Totale in attesa',
-    totalOverdue: 'Totale in ritardo',
+    totalExpenses: 'Totale del mese',
+    totalPaid: 'Pagato',
+    totalPending: 'Da pagare',
+    totalOverdue: 'In ritardo',
+    monthIncome: 'Entrate del mese',
+    monthLeftover: 'Residuo del mese',
+    paidByMember: 'Ha pagato',
     byCategory: 'Per categoria',
     monthlyEvolution: 'Evoluzione mensile',
     settings: 'Impostazioni',
