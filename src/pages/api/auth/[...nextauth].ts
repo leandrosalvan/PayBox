@@ -3,6 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
 import { prisma } from '@/lib/prisma'
 import { verifyPassword } from '@/lib/auth'
+import { findUserByEmail, normalizeEmail } from '@/lib/user-lookup'
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -19,9 +20,7 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-        })
+        const user = await findUserByEmail(credentials.email)
 
         if (!user || !user.password) return null
 
@@ -45,13 +44,12 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account }) {
       if (account?.provider === 'google') {
-        const existing = await prisma.user.findUnique({
-          where: { email: user.email! },
-        })
+        // Se já existe conta com este e-mail (por exemplo, criada com senha), o Google entra nela.
+        const existing = await findUserByEmail(user.email!)
         if (!existing) {
           await prisma.user.create({
             data: {
-              email: user.email!,
+              email: normalizeEmail(user.email!),
               name: user.name,
               image: user.image,
               emailVerified: new Date(),
@@ -71,9 +69,7 @@ export const authOptions: NextAuthOptions = {
     },
     async jwt({ token, user, account }) {
       if (user) {
-        const dbUser = await prisma.user.findUnique({
-          where: { email: user.email! },
-        })
+        const dbUser = await findUserByEmail(user.email!)
         if (dbUser) {
           token.sub = dbUser.id
           token.name = dbUser.name

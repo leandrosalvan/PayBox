@@ -6,7 +6,7 @@ import { GetServerSideProps } from 'next'
 import AppLayout from '@/components/layout/AppLayout'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
-import { formatCurrency, formatDate, formatMonthYear, t, SupportedLocale, SupportedCurrency } from '@/lib/locales'
+import { formatCurrency, formatDate, formatMonthYear, paidLabel, t, SupportedLocale, SupportedCurrency } from '@/lib/locales'
 import { cn } from '@/lib/utils'
 import { expenseMutationError, setExpensePaymentWithConflictRetry } from '@/lib/expense-payment'
 import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Wallet } from 'lucide-react'
@@ -37,8 +37,8 @@ export default function WalletHome() {
     if (res.ok) setWallet(await res.json())
   }, [walletId])
 
-  const fetchExpenses = useCallback(async () => {
-    setLoading(true)
+  const fetchExpenses = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setLoading(true)
     try {
       const res = await fetch(`/api/wallets/${walletId}/expenses?month=${monthKey}`)
       if (!res.ok) throw new Error('Não foi possível atualizar a lista de contas.')
@@ -67,7 +67,7 @@ export default function WalletHome() {
         status: expense.status === 'paid' ? 'pending' : 'paid',
         expectedUpdatedAt: expense.updatedAt,
       })
-      if (res.ok) await fetchExpenses()
+      if (res.ok) await fetchExpenses({ silent: true })
       else setMutationError(await expenseMutationError(res, 'Não foi possível atualizar a conta'))
     } catch (error) {
       setMutationError(error instanceof Error ? error.message : 'Não foi possível conectar ao servidor. Tente novamente.')
@@ -94,6 +94,18 @@ export default function WalletHome() {
     return { paid, pending, overdue, total: paid + pending + overdue }
   }, [expenses])
 
+  const income = useMemo(() => {
+    const members: any[] = wallet?.members ?? []
+    const total = members.reduce((sum, m) => sum + (m.salary || 0), 0)
+    const perMember = members.map((m) => {
+      const paid = expenses
+        .filter((e) => e.status === 'paid' && e.paidById === m.userId)
+        .reduce((sum, e) => sum + e.amount, 0)
+      return { id: m.id, name: m.user?.name || m.user?.email || '', salary: m.salary || 0, paid }
+    })
+    return { total, perMember }
+  }, [wallet, expenses])
+
   if (!wallet || loading) {
     return (
       <AppLayout>
@@ -108,7 +120,7 @@ export default function WalletHome() {
     <AppLayout title={`${wallet.name} - PayBox`}>
       <div className="py-4">
         <div className="mb-4 flex items-center justify-between">
-          <Link href="/wallets" className="flex items-center text-slate-400 hover:text-white">
+          <Link href="/wallets?all=1" className="flex items-center text-slate-400 hover:text-white">
             <ArrowLeft size={20} className="mr-1" /> {t(locale, 'wallets')}
           </Link>
           <Link href={`/wallets/${walletId}/settings`} className="text-sm text-primary-400 hover:underline">
@@ -130,20 +142,73 @@ export default function WalletHome() {
 
         {mutationError && <p className="mb-4 rounded-lg bg-red-500/15 p-3 text-sm text-red-300">{mutationError}</p>}
 
-        <div className="mb-4 grid grid-cols-3 gap-2">
-          <Card className="text-center">
-            <p className="text-xs text-slate-400">{t(locale, 'totalPaid')}</p>
-            <p className="font-semibold text-primary-400">{formatCurrency(totals.paid, currency, locale)}</p>
+        <div className="mb-4 space-y-2">
+          <Card>
+            <p className="text-xs uppercase tracking-wide text-slate-400">{t(locale, 'totalExpenses')}</p>
+            <p className="mt-1 text-2xl font-bold text-white">{formatCurrency(totals.total, currency, locale)}</p>
           </Card>
-          <Card className="text-center">
-            <p className="text-xs text-slate-400">{t(locale, 'totalPending')}</p>
-            <p className="font-semibold text-slate-300">{formatCurrency(totals.pending, currency, locale)}</p>
-          </Card>
-          <Card className="text-center">
-            <p className="text-xs text-slate-400">{t(locale, 'totalOverdue')}</p>
-            <p className="font-semibold text-red-400">{formatCurrency(totals.overdue, currency, locale)}</p>
-          </Card>
+          <div className="grid grid-cols-3 gap-2">
+            <Card className="relative overflow-hidden p-3">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-red-500/50 via-red-500/20 to-red-500/0" />
+              <p className="relative text-xs font-medium text-slate-200 [text-shadow:0_1px_3px_rgba(0,0,0,0.75)]">{t(locale, 'totalOverdue')}</p>
+              <p className="relative mt-1 text-sm font-semibold text-red-400 [text-shadow:0_1px_3px_rgba(0,0,0,0.75)] sm:text-base">{formatCurrency(totals.overdue, currency, locale)}</p>
+            </Card>
+            <Card className="relative overflow-hidden p-3">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-yellow-400/50 via-yellow-400/20 to-yellow-400/0" />
+              <p className="relative text-xs font-medium text-slate-200 [text-shadow:0_1px_3px_rgba(0,0,0,0.75)]">{t(locale, 'totalPending')}</p>
+              <p className="relative mt-1 text-sm font-semibold text-yellow-400 [text-shadow:0_1px_3px_rgba(0,0,0,0.75)] sm:text-base">{formatCurrency(totals.pending, currency, locale)}</p>
+            </Card>
+            <Card className="relative overflow-hidden p-3">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-green-500/50 via-green-500/20 to-green-500/0" />
+              <p className="relative text-xs font-medium text-slate-200 [text-shadow:0_1px_3px_rgba(0,0,0,0.75)]">{t(locale, 'totalPaid')}</p>
+              <p className="relative mt-1 text-sm font-semibold text-primary-400 [text-shadow:0_1px_3px_rgba(0,0,0,0.75)] sm:text-base">{formatCurrency(totals.paid, currency, locale)}</p>
+            </Card>
+          </div>
         </div>
+
+        {income.total > 0 && (
+          <Card className="mb-4">
+            {wallet.salaryMode === 'separate' && income.perMember.length > 1 ? (
+              <div className="space-y-3">
+                {income.perMember.map((m) => {
+                  const leftover = m.salary - m.paid
+                  return (
+                    <div key={m.id}>
+                      <p className="text-sm font-medium text-white">{m.name}</p>
+                      <div className="mt-1 grid grid-cols-3 gap-2 text-xs text-slate-400">
+                        <div>
+                          <p>{t(locale, 'monthIncome')}</p>
+                          <p className="text-sm font-semibold text-white">{formatCurrency(m.salary, currency, locale)}</p>
+                        </div>
+                        <div>
+                          <p>{t(locale, 'paidByMember')}</p>
+                          <p className="text-sm font-semibold text-white">{formatCurrency(m.paid, currency, locale)}</p>
+                        </div>
+                        <div>
+                          <p>{t(locale, 'monthLeftover')}</p>
+                          <p className={`text-sm font-semibold ${leftover >= 0 ? 'text-primary-400' : 'text-red-400'}`}>{formatCurrency(leftover, currency, locale)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
+                <div>
+                  <p>{t(locale, 'monthIncome')}</p>
+                  <p className="text-base font-semibold text-white">{formatCurrency(income.total, currency, locale)}</p>
+                </div>
+                <div>
+                  <p>{t(locale, 'monthLeftover')}</p>
+                  <p className={`text-base font-semibold ${income.total - totals.total >= 0 ? 'text-primary-400' : 'text-red-400'}`}>
+                    {formatCurrency(income.total - totals.total, currency, locale)}
+                  </p>
+                </div>
+              </div>
+            )}
+          </Card>
+        )}
 
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">{t(locale, 'addExpense')}</h2>
@@ -179,16 +244,34 @@ export default function WalletHome() {
                   </div>
                   <div className="text-right">
                     <p className="font-semibold">{formatCurrency(expense.amount, currency, locale)}</p>
-                    <button
-                      disabled={payingExpenseIds.has(expense.id)}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        togglePay(expense)
-                      }}
-                      className={`text-xs disabled:cursor-wait disabled:opacity-60 ${expense.status === 'paid' ? 'text-primary-400' : 'text-slate-400'}`}
-                    >
-                      {payingExpenseIds.has(expense.id) ? 'Atualizando...' : expense.status === 'paid' ? t(locale, 'paid') : t(locale, 'pending')}
-                    </button>
+                    {expense.status === 'paid' ? (
+                      <>
+                        <p className="text-xs text-primary-400">
+                          {paidLabel(expense, locale)}
+                        </p>
+                        <button
+                          disabled={payingExpenseIds.has(expense.id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (confirm(t(locale, 'undoPaymentConfirm'))) togglePay(expense)
+                          }}
+                          className="rounded px-1 text-xs text-slate-300 underline transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-60"
+                        >
+                          {payingExpenseIds.has(expense.id) ? 'Atualizando...' : t(locale, 'undoPayment')}
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        disabled={payingExpenseIds.has(expense.id)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          togglePay(expense)
+                        }}
+                        className="rounded px-1 text-xs text-slate-300 underline transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-60"
+                      >
+                        {payingExpenseIds.has(expense.id) ? 'Atualizando...' : t(locale, 'markAsPaid')}
+                      </button>
+                    )}
                   </div>
                 </div>
               </Card>

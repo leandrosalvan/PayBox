@@ -76,7 +76,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const newInstances = generateSeriesInstances(
       walletId,
       expense.series.id,
-      new Date(expense.dueDate.getFullYear(), expense.dueDate.getMonth() + 1, 1),
+      new Date(Date.UTC(expense.dueDate.getUTCFullYear(), expense.dueDate.getUTCMonth() + 1, 1)),
       expense.series.dueDay,
       count - 1,
       {
@@ -105,12 +105,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const series = expense.series || {
       description: expense.description,
       amount: expense.amount,
-      dueDay: expense.dueDate.getDate(),
+      dueDay: expense.dueDate.getUTCDate(),
       categoryId: expense.categoryId,
       paidByDefaultId: expense.paidById,
     }
-    const startDate = new Date()
-    startDate.setDate(1)
+    const now = new Date()
+    const startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
     const newSeries = await prisma.expenseSeries.create({
       data: {
         walletId,
@@ -119,7 +119,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         dueDay: series.dueDay,
         categoryId: series.categoryId,
         startDate,
-        endDate: new Date(startDate.getFullYear(), startDate.getMonth() + 12, 1),
+        endDate: new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + 12, 1)),
         type: 'fixed',
         createdById: userId,
         paidByDefaultId: series.paidByDefaultId || userId,

@@ -8,24 +8,51 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
 import Card from '@/components/ui/Card'
-import { supportedCurrencies, supportedLocales, t, SupportedLocale, SupportedCurrency } from '@/lib/locales'
-import { Wallet } from '@prisma/client'
+import { formatCurrency, supportedCurrencies, supportedLocales, t, SupportedLocale, SupportedCurrency } from '@/lib/locales'
 import type { ChangeEvent } from 'react'
-import { Plug } from 'lucide-react'
+import { Plug, Plus } from 'lucide-react'
+import { prisma } from '@/lib/prisma'
+import { getLatestWalletId } from '@/lib/wallet'
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const session = await getSession(context)
   if (!session) return { redirect: { destination: '/login', permanent: false } }
+
+  // Abre direto na carteira mais recente. `?all=1` mostra a lista; convites pendentes também.
+  const userId = session.user?.id
+  if (userId && context.query.all !== '1') {
+    const [walletId, pendingInvites] = await Promise.all([
+      getLatestWalletId(userId),
+      session.user?.email
+        ? prisma.walletInvite.count({
+            where: { email: session.user.email, status: 'pending', expiresAt: { gt: new Date() } },
+          })
+        : Promise.resolve(0),
+    ])
+    if (walletId && pendingInvites === 0) {
+      return { redirect: { destination: `/wallets/${walletId}`, permanent: false } }
+    }
+  }
   return { props: {} }
+}
+
+type WalletItem = {
+  id: string
+  name: string
+  locale: string
+  currency: string
+  members: { id: string; user: { name: string | null; email: string } }[]
+  summary: { paid: number; pending: number; overdue: number; overdueCount: number }
 }
 
 export default function Wallets() {
   const { data: session } = useSession()
   const router = useRouter()
-  const [wallets, setWallets] = useState<Wallet[]>([])
+  const [wallets, setWallets] = useState<WalletItem[]>([])
   const [invites, setInvites] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
   const [locale, setLocale] = useState<SupportedLocale>('pt-BR')
   const [currency, setCurrency] = useState<SupportedCurrency>('BRL')
@@ -129,41 +156,99 @@ export default function Wallets() {
           <p className="mb-4 text-slate-400">{t('pt-BR', 'noWallets')}</p>
         ) : (
           <div className="mb-6 space-y-3">
-            {wallets.map((wallet) => (
-              <Link key={wallet.id} href={`/wallets/${wallet.id}`}>
-                <Card className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-white">{wallet.name}</p>
-                    <p className="text-sm text-slate-400">
-                      {wallet.locale} · {wallet.currency}
-                    </p>
-                  </div>
-                  <span className="text-2xl text-primary-400">›</span>
-                </Card>
-              </Link>
-            ))}
+            {wallets.map((wallet) => {
+              const summary = wallet.summary
+              const total = summary.paid + summary.pending + summary.overdue
+              const percentPaid = total > 0 ? Math.round((summary.paid / total) * 100) : 0
+              const walletLocale = wallet.locale as SupportedLocale
+              const walletCurrency = wallet.currency as SupportedCurrency
+              return (
+                <Link key={wallet.id} href={`/wallets/${wallet.id}`}>
+                  <Card>
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-white">{wallet.name}</p>
+                      <div className="flex -space-x-2">
+                        {wallet.members.slice(0, 4).map((member) => (
+                          <span
+                            key={member.id}
+                            title={member.user.name || member.user.email}
+                            className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-dark-800 bg-dark-600 text-xs font-medium uppercase text-slate-200"
+                          >
+                            {(member.user.name || member.user.email).charAt(0)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    {total > 0 ? (
+                      <>
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-400">
+                          <div>
+                            <p>{t(walletLocale, 'totalOverdue')}</p>
+                            <p className={`text-sm font-semibold ${summary.overdue > 0 ? 'text-red-400' : 'text-slate-300'}`}>
+                              {formatCurrency(summary.overdue, walletCurrency, walletLocale)}
+                            </p>
+                          </div>
+                          <div>
+                            <p>{t(walletLocale, 'totalPending')}</p>
+                            <p className="text-sm font-semibold text-yellow-400">
+                              {formatCurrency(summary.pending, walletCurrency, walletLocale)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-dark-700">
+                          <div className="h-full rounded-full bg-green-500" style={{ width: `${percentPaid}%` }} />
+                        </div>
+                        <p className="mt-1 text-xs text-slate-400">
+                          {percentPaid}% {t(walletLocale, 'totalPaid').toLowerCase()} · {formatCurrency(summary.paid, walletCurrency, walletLocale)}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-2 text-sm text-slate-400">{t(walletLocale, 'noExpenses')}</p>
+                    )}
+                  </Card>
+                </Link>
+              )
+            })}
           </div>
         )}
 
-        <form onSubmit={handleCreate} className="space-y-4 rounded-xl border border-slate-700 bg-dark-800 p-4">
-          <h2 className="text-lg font-semibold">{t('pt-BR', 'newWallet')}</h2>
-          <Input label={t('pt-BR', 'walletName')} value={name} onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)} required />
-          <Select label={t('pt-BR', 'language')} options={supportedLocales} value={locale} onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocale(e.target.value as SupportedLocale)} />
-          <Select label={t('pt-BR', 'currency')} options={supportedCurrencies} value={currency} onChange={(e: ChangeEvent<HTMLSelectElement>) => setCurrency(e.target.value as SupportedCurrency)} />
-          <Select
-            label={t('pt-BR', 'salaryMode')}
-            options={[
-              { value: 'joint', label: t('pt-BR', 'joint') },
-              { value: 'separate', label: t('pt-BR', 'separate') },
-            ]}
-            value={salaryMode}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) => setSalaryMode(e.target.value)}
-          />
-          {error && <p className="text-sm text-red-400">{error}</p>}
-          <Button type="submit" className="w-full" isLoading={creating}>
-            {t('pt-BR', 'createWallet')}
+        {!showForm && wallets.length > 0 ? (
+          <Button variant="secondary" className="w-full" onClick={() => setShowForm(true)}>
+            <Plus size={18} className="mr-2" /> {t('pt-BR', 'newWallet')}
           </Button>
-        </form>
+        ) : (
+          <form onSubmit={handleCreate} className="space-y-4 rounded-xl border border-slate-700 bg-dark-800 p-4">
+            <h2 className="text-lg font-semibold">{t('pt-BR', 'newWallet')}</h2>
+            <Input label={t('pt-BR', 'walletName')} value={name} onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)} required autoFocus={wallets.length > 0} />
+            <details className="group">
+              <summary className="cursor-pointer text-sm text-slate-400 hover:text-white">Mais opções (idioma, moeda e salários)</summary>
+              <div className="mt-3 space-y-4">
+                <Select label={t('pt-BR', 'language')} options={supportedLocales} value={locale} onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocale(e.target.value as SupportedLocale)} />
+                <Select label={t('pt-BR', 'currency')} options={supportedCurrencies} value={currency} onChange={(e: ChangeEvent<HTMLSelectElement>) => setCurrency(e.target.value as SupportedCurrency)} />
+                <Select
+                  label={t('pt-BR', 'salaryMode')}
+                  options={[
+                    { value: 'joint', label: t('pt-BR', 'joint') },
+                    { value: 'separate', label: t('pt-BR', 'separate') },
+                  ]}
+                  value={salaryMode}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setSalaryMode(e.target.value)}
+                />
+              </div>
+            </details>
+            {error && <p className="text-sm text-red-400">{error}</p>}
+            <div className="flex gap-2">
+              {wallets.length > 0 && (
+                <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
+                  Cancelar
+                </Button>
+              )}
+              <Button type="submit" className="flex-1" isLoading={creating}>
+                {t('pt-BR', 'createWallet')}
+              </Button>
+            </div>
+          </form>
+        )}
       </div>
     </AppLayout>
   )

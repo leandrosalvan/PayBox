@@ -32,3 +32,32 @@ export function serializeWallet(wallet: NonNullable<Awaited<ReturnType<typeof ge
     })),
   }
 }
+
+// Carteira mais recente do usuário: a última criada ou editada, contando também as alterações
+// nas despesas dela.
+export async function getLatestWalletId(userId: string) {
+  const memberships = await prisma.walletMember.findMany({
+    where: { userId },
+    select: { wallet: { select: { id: true, createdAt: true, updatedAt: true } } },
+  })
+  if (memberships.length === 0) return null
+  if (memberships.length === 1) return memberships[0].wallet.id
+
+  const lastExpenseChange = await prisma.expense.groupBy({
+    by: ['walletId'],
+    where: { walletId: { in: memberships.map((m) => m.wallet.id) } },
+    _max: { updatedAt: true },
+  })
+  const expenseByWallet = new Map(lastExpenseChange.map((row) => [row.walletId, row._max.updatedAt]))
+
+  let latest = { id: memberships[0].wallet.id, time: 0 }
+  for (const { wallet } of memberships) {
+    const time = Math.max(
+      wallet.createdAt.getTime(),
+      wallet.updatedAt.getTime(),
+      expenseByWallet.get(wallet.id)?.getTime() ?? 0
+    )
+    if (time > latest.time) latest = { id: wallet.id, time }
+  }
+  return latest.id
+}

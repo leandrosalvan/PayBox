@@ -69,20 +69,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const expenseType = type as ExpenseType
-    const startDate = new Date(dueDate + 'T00:00:00')
+    const startDate = new Date(dueDate + 'T00:00:00.000Z')
 
     let endDate: Date | null = null
     let count = 1
     if (expenseType === 'fixed') {
       count = 12
-      endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 12, 1)
+      endDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + 12, 1))
     } else if (expenseType === 'installment') {
       const installments = Number(totalInstallments) || 1
       if (installments < 2 || installments > 120) {
         return res.status(400).json({ error: 'Quantidade de parcelas inválida' })
       }
       count = installments
-      endDate = new Date(startDate.getFullYear(), startDate.getMonth() + installments, 1)
+      endDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + installments, 1))
     }
 
     const { series, createdExpenses } = await prisma.$transaction(async (tx) => {

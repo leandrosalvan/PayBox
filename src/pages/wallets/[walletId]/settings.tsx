@@ -19,6 +19,39 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   return { props: {} }
 }
 
+function formatSalary(cents: number) {
+  return (cents / 100).toFixed(2).replace('.', ',')
+}
+
+function SalaryInput({ salary, onCommit }: { salary: number; onCommit: (value: string) => void }) {
+  const [draft, setDraft] = useState(formatSalary(salary))
+
+  useEffect(() => {
+    setDraft(formatSalary(salary))
+  }, [salary])
+
+  function commit() {
+    const parsed = parseFloat(draft.replace(',', '.'))
+    if (Number.isNaN(parsed) || parsed < 0) return setDraft(formatSalary(salary))
+    if (floatToCents(parsed) !== salary) onCommit(draft)
+    else setDraft(formatSalary(salary))
+  }
+
+  return (
+    <Input
+      type="text"
+      inputMode="decimal"
+      value={draft}
+      onChange={(e: ChangeEvent<HTMLInputElement>) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+      }}
+      className="w-28 py-1 text-sm"
+    />
+  )
+}
+
 export default function WalletSettings() {
   const router = useRouter()
   const { walletId } = router.query
@@ -110,7 +143,7 @@ export default function WalletSettings() {
   async function deleteWallet() {
     if (!confirm('Tem certeza que deseja excluir esta carteira?')) return
     const res = await fetch(`/api/wallets/${walletId}`, { method: 'DELETE' })
-    if (res.ok) router.push('/wallets')
+    if (res.ok) router.push('/wallets?all=1')
   }
 
   if (!wallet) {
@@ -200,12 +233,9 @@ export default function WalletSettings() {
                   <p className="text-xs text-slate-400">{member.user.email}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Input
-                    type="text"
-                    inputMode="decimal"
-                    value={(member.salary / 100).toFixed(2).replace('.', ',')}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => updateSalary(member.id, e.target.value)}
-                    className="w-28 py-1 text-sm"
+                  <SalaryInput
+                    salary={member.salary}
+                    onCommit={(value) => updateSalary(member.id, value)}
                   />
                   <Button variant="danger" size="sm" onClick={() => removeMember(member.id)}>
                     ×

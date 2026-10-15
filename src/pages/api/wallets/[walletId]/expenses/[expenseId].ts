@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { requireWalletMember } from '@/lib/wallet'
-import { assertCategoryInWallet, assertUserInWallet } from '@/server/paybox/validation'
+import { assertCategoryInWallet } from '@/server/paybox/validation'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = await requireAuth(req, res)
@@ -34,20 +34,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'PUT') {
-    const { description, amount, dueDate, categoryId, paidById, expectedUpdatedAt } = req.body
+    const { description, amount, dueDate, categoryId, expectedUpdatedAt } = req.body
     if (typeof expectedUpdatedAt !== 'string') {
       return res.status(400).json({ error: 'Versão da despesa obrigatória' })
     }
     const data: any = {}
     if (description !== undefined) data.description = description
     if (typeof amount === 'number') data.amount = amount
-    if (dueDate) data.dueDate = new Date(dueDate + 'T00:00:00')
+    if (dueDate) data.dueDate = new Date(dueDate + 'T00:00:00.000Z')
     if (categoryId !== undefined) data.categoryId = categoryId || null
-    if (paidById !== undefined) data.paidById = paidById || null
 
     const updated = await prisma.$transaction(async (tx) => {
       await assertCategoryInWallet(tx, walletId, categoryId)
-      await assertUserInWallet(tx, walletId, paidById)
       const changed = await tx.expense.updateMany({
         where: { id: expenseId, walletId, updatedAt: new Date(expectedUpdatedAt) },
         data,
