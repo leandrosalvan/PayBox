@@ -9,7 +9,7 @@ import Card from '@/components/ui/Card'
 import { formatCurrency, formatDate, formatMonthYear, paidLabel, t, SupportedLocale, SupportedCurrency } from '@/lib/locales'
 import { cn } from '@/lib/utils'
 import { expenseMutationError, setExpensePaymentWithConflictRetry } from '@/lib/expense-payment'
-import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Wallet } from 'lucide-react'
+import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Settings, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const session = await getSession(context)
@@ -23,6 +23,7 @@ export default function WalletHome() {
   const { data: session } = useSession()
   const [wallet, setWallet] = useState<any>(null)
   const [expenses, setExpenses] = useState<any[]>([])
+  const [entries, setEntries] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [payingExpenseIds, setPayingExpenseIds] = useState<Set<string>>(() => new Set())
   const [mutationError, setMutationError] = useState('')
@@ -49,13 +50,27 @@ export default function WalletHome() {
     }
   }, [monthKey, walletId])
 
+  const fetchEntries = useCallback(async () => {
+    const res = await fetch(`/api/wallets/${walletId}/entries?month=${monthKey}`)
+    if (res.ok) setEntries((await res.json()).entries)
+  }, [monthKey, walletId])
+
+  async function deleteEntry(entry: any) {
+    if (!confirm(`Excluir a entrada "${entry.description}"?`)) return
+    setMutationError('')
+    const res = await fetch(`/api/wallets/${walletId}/entries?id=${entry.id}`, { method: 'DELETE' })
+    if (res.ok) await fetchEntries()
+    else setMutationError('Não foi possível excluir a entrada')
+  }
+
   useEffect(() => {
     if (!walletId || typeof walletId !== 'string' || !session) return
     fetchWallet()
+    void fetchEntries()
     void fetchExpenses().catch(() => {
       setMutationError('Não foi possível carregar as contas. Tente novamente.')
     })
-  }, [walletId, session, fetchWallet, fetchExpenses])
+  }, [walletId, session, fetchWallet, fetchExpenses, fetchEntries])
 
   async function togglePay(expense: any) {
     setMutationError('')
@@ -96,15 +111,18 @@ export default function WalletHome() {
 
   const income = useMemo(() => {
     const members: any[] = wallet?.members ?? []
-    const total = members.reduce((sum, m) => sum + (m.salary || 0), 0)
+    const memberIncome = (m: any) =>
+      (m.salary || 0) + (m.extraIncomes ?? []).reduce((sum: number, i: any) => sum + i.amount, 0)
+    const entriesTotal = entries.reduce((sum, e) => sum + e.amount, 0)
+    const total = members.reduce((sum, m) => sum + memberIncome(m), 0) + entriesTotal
     const perMember = members.map((m) => {
       const paid = expenses
         .filter((e) => e.status === 'paid' && e.paidById === m.userId)
         .reduce((sum, e) => sum + e.amount, 0)
-      return { id: m.id, name: m.user?.name || m.user?.email || '', salary: m.salary || 0, paid }
+      return { id: m.id, name: m.user?.name || m.user?.email || '', salary: memberIncome(m), paid }
     })
-    return { total, perMember }
-  }, [wallet, expenses])
+    return { total, perMember, entriesTotal }
+  }, [wallet, expenses, entries])
 
   if (!wallet || loading) {
     return (
@@ -123,29 +141,120 @@ export default function WalletHome() {
           <Link href="/wallets?all=1" className="flex items-center text-slate-400 hover:text-white">
             <ArrowLeft size={20} className="mr-1" /> {t(locale, 'wallets')}
           </Link>
-          <Link href={`/wallets/${walletId}/settings`} className="text-sm text-primary-400 hover:underline">
-            {t(locale, 'settings')}
+        </div>
+
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h1 className="min-w-0 break-words text-2xl font-bold">{wallet.name}</h1>
+          <Link
+            href={`/wallets/${walletId}/settings`}
+            className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-dark-800 px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-dark-700 hover:text-white"
+          >
+            <Settings size={16} /> <span className="hidden min-[400px]:inline">Ajustes da carteira</span><span className="min-[400px]:hidden">Ajustes</span>
           </Link>
         </div>
 
-        <h1 className="mb-2 text-2xl font-bold">{wallet.name}</h1>
+        {(() => {
+          const monthNav = (
+            <div className="flex items-center justify-between gap-1 p-3">
+              <button onClick={() => changeMonth(-1)} className="shrink-0 rounded-lg p-1 hover:bg-dark-700 min-[400px]:p-1.5" aria-label="Mês anterior">
+                <ChevronLeft size={20} />
+              </button>
+              <span className="text-center text-sm font-semibold capitalize leading-tight">{formatMonthYear(currentDate, locale)}</span>
+              <button onClick={() => changeMonth(1)} className="shrink-0 rounded-lg p-1 hover:bg-dark-700 min-[400px]:p-1.5" aria-label="Próximo mês">
+                <ChevronRight size={20} />
+              </button>
+            </div>
+          )
+          const separate = wallet.salaryMode === 'separate' && income.perMember.length > 1
+          const balance = income.total - totals.total
+          const positive = balance >= 0
 
-        <div className="mb-4 flex items-center justify-between rounded-xl bg-dark-800 p-3">
-          <button onClick={() => changeMonth(-1)} className="rounded-lg p-2 hover:bg-dark-700">
-            <ChevronLeft size={20} />
-          </button>
-          <span className="font-semibold capitalize">{formatMonthYear(currentDate, locale)}</span>
-          <button onClick={() => changeMonth(1)} className="rounded-lg p-2 hover:bg-dark-700">
-            <ChevronRight size={20} />
-          </button>
-        </div>
+          if (income.total > 0 && !separate) {
+            const shadow = '[text-shadow:0_1px_3px_rgba(0,0,0,0.75)]'
+            return (
+              <div className="relative mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-0.5 overflow-hidden rounded-xl bg-dark-800 px-1.5 py-3 text-[11px] font-medium text-slate-200 min-[400px]:gap-1 min-[400px]:px-2 min-[400px]:text-xs">
+                <div
+                  className={`pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l ${
+                    positive ? 'from-blue-500/50 via-blue-500/20' : 'from-red-500/50 via-red-500/20'
+                  } to-transparent`}
+                />
+                <div className="relative flex items-center gap-1">
+                  <button onClick={() => changeMonth(-1)} className="shrink-0 rounded-lg p-1 hover:bg-dark-700 min-[400px]:p-1.5" aria-label="Mês anterior">
+                    <ChevronLeft size={20} />
+                  </button>
+                  <div className="min-w-0 whitespace-nowrap">
+                    <p>{t(locale, 'incomeShort')}</p>
+                    <p className="mt-0.5 text-[13px] font-bold text-white min-[400px]:text-sm">{formatCurrency(income.total, currency, locale)}</p>
+                  </div>
+                </div>
+                <span className="relative flex flex-col items-center px-0.5 text-center font-semibold leading-tight text-white min-[400px]:px-1">
+                  <span className="text-xs capitalize min-[400px]:text-sm">
+                    {new Intl.DateTimeFormat(locale, { month: 'long', timeZone: 'UTC' }).format(currentDate)}
+                  </span>
+                  <span className="text-xs text-slate-300 min-[400px]:text-sm">
+                    {new Intl.DateTimeFormat(locale, { year: 'numeric', timeZone: 'UTC' }).format(currentDate)}
+                  </span>
+                </span>
+                <div className="relative flex items-center justify-end gap-1 text-right">
+                  <div className="min-w-0 whitespace-nowrap">
+                    <p className={shadow}>{t(locale, 'balanceShort')}</p>
+                    <p className={`mt-0.5 text-[13px] font-bold min-[400px]:text-sm ${shadow} ${positive ? 'text-blue-200' : 'text-red-300'}`}>
+                      {formatCurrency(balance, currency, locale)}
+                    </p>
+                  </div>
+                  <button onClick={() => changeMonth(1)} className="shrink-0 rounded-lg p-1 hover:bg-dark-700 min-[400px]:p-1.5" aria-label="Próximo mês">
+                    <ChevronRight size={20} />
+                  </button>
+                </div>
+              </div>
+            )
+          }
+
+          return (
+            <div className="mb-4 overflow-hidden rounded-xl bg-dark-800">
+              {monthNav}
+              {income.total > 0 && (
+                <div className="space-y-3 border-t border-slate-700/60 p-4">
+                  {income.entriesTotal > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-300">Entradas avulsas do mês</span>
+                      <span className="font-semibold text-blue-300">+{formatCurrency(income.entriesTotal, currency, locale)}</span>
+                    </div>
+                  )}
+                  {income.perMember.map((m) => {
+                    const leftover = m.salary - m.paid
+                    return (
+                      <div key={m.id}>
+                        <p className="text-sm font-medium text-white">{m.name}</p>
+                        <div className="mt-1 grid grid-cols-3 gap-2 text-xs text-slate-400">
+                          <div>
+                            <p>{t(locale, 'monthIncome')}</p>
+                            <p className="text-sm font-semibold text-white">{formatCurrency(m.salary, currency, locale)}</p>
+                          </div>
+                          <div>
+                            <p>{t(locale, 'paidByMember')}</p>
+                            <p className="text-sm font-semibold text-white">{formatCurrency(m.paid, currency, locale)}</p>
+                          </div>
+                          <div>
+                            <p>{t(locale, 'monthLeftover')}</p>
+                            <p className={`text-sm font-semibold ${leftover >= 0 ? 'text-primary-400' : 'text-red-400'}`}>{formatCurrency(leftover, currency, locale)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {mutationError && <p className="mb-4 rounded-lg bg-red-500/15 p-3 text-sm text-red-300">{mutationError}</p>}
 
         <div className="mb-4 space-y-2">
-          <Card>
-            <p className="text-xs uppercase tracking-wide text-slate-400">{t(locale, 'totalExpenses')}</p>
-            <p className="mt-1 text-2xl font-bold text-white">{formatCurrency(totals.total, currency, locale)}</p>
+          <Card className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium uppercase tracking-wide text-slate-400">{t(locale, 'totalExpenses')}</p>
+            <p className="text-2xl font-bold text-white">{formatCurrency(totals.total, currency, locale)}</p>
           </Card>
           <div className="grid grid-cols-3 gap-2">
             <Card className="relative overflow-hidden p-3">
@@ -166,58 +275,26 @@ export default function WalletHome() {
           </div>
         </div>
 
-        {income.total > 0 && (
-          <Card className="mb-4">
-            {wallet.salaryMode === 'separate' && income.perMember.length > 1 ? (
-              <div className="space-y-3">
-                {income.perMember.map((m) => {
-                  const leftover = m.salary - m.paid
-                  return (
-                    <div key={m.id}>
-                      <p className="text-sm font-medium text-white">{m.name}</p>
-                      <div className="mt-1 grid grid-cols-3 gap-2 text-xs text-slate-400">
-                        <div>
-                          <p>{t(locale, 'monthIncome')}</p>
-                          <p className="text-sm font-semibold text-white">{formatCurrency(m.salary, currency, locale)}</p>
-                        </div>
-                        <div>
-                          <p>{t(locale, 'paidByMember')}</p>
-                          <p className="text-sm font-semibold text-white">{formatCurrency(m.paid, currency, locale)}</p>
-                        </div>
-                        <div>
-                          <p>{t(locale, 'monthLeftover')}</p>
-                          <p className={`text-sm font-semibold ${leftover >= 0 ? 'text-primary-400' : 'text-red-400'}`}>{formatCurrency(leftover, currency, locale)}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
-                <div>
-                  <p>{t(locale, 'monthIncome')}</p>
-                  <p className="text-base font-semibold text-white">{formatCurrency(income.total, currency, locale)}</p>
-                </div>
-                <div>
-                  <p>{t(locale, 'monthLeftover')}</p>
-                  <p className={`text-base font-semibold ${income.total - totals.total >= 0 ? 'text-primary-400' : 'text-red-400'}`}>
-                    {formatCurrency(income.total - totals.total, currency, locale)}
-                  </p>
-                </div>
-              </div>
-            )}
-          </Card>
-        )}
-
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{t(locale, 'addExpense')}</h2>
-          <Link href={`/wallets/${walletId}/expenses/new`}>
-            <Button size="sm" className="px-3">
-              <Plus size={18} />
-            </Button>
+        <div className="mb-4 mt-5 grid grid-cols-2 justify-items-center gap-2.5">
+          <Link
+            href={`/wallets/${walletId}/entries/new?month=${monthKey}`}
+            className="relative flex w-full max-w-[112px] items-center justify-center overflow-hidden rounded-full bg-gradient-to-r from-blue-600 to-blue-500 min-h-[48px] px-4 py-1.5 text-center text-sm font-bold leading-tight text-white shadow-lg shadow-blue-900/40 transition active:scale-95 hover:brightness-110"
+          >
+            <TrendingUp aria-hidden size={68} strokeWidth={2.5} className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/20" />
+            <span className="relative [text-shadow:0_1px_4px_rgba(0,0,0,0.55)]">Nova<br />entrada</span>
+          </Link>
+          <Link
+            href={`/wallets/${walletId}/expenses/new`}
+            className="relative flex w-full max-w-[112px] items-center justify-center overflow-hidden rounded-full bg-gradient-to-r from-rose-600 to-red-500 min-h-[48px] px-4 py-1.5 text-center text-sm font-bold leading-tight text-white shadow-lg shadow-red-900/40 transition active:scale-95 hover:brightness-110"
+          >
+            <TrendingDown aria-hidden size={68} strokeWidth={2.5} className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/20" />
+            <span className="relative [text-shadow:0_1px_4px_rgba(0,0,0,0.55)]">Nova<br />despesa</span>
           </Link>
         </div>
+
+        <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
+          <TrendingDown size={18} className="text-red-300" /> Despesas do mês
+        </h2>
 
         {expenses.length === 0 ? (
           <p className="text-slate-400">{t(locale, 'noExpenses')}</p>
@@ -261,6 +338,10 @@ export default function WalletHome() {
                         </button>
                       </>
                     ) : (
+                      <>
+                        <p className={cn('text-xs font-medium', expense.status === 'overdue' ? 'text-red-300' : 'text-yellow-300')}>
+                          {t(locale, expense.status === 'overdue' ? 'statusOverdue' : 'statusOpen')}
+                        </p>
                       <button
                         disabled={payingExpenseIds.has(expense.id)}
                         onClick={(e) => {
@@ -271,7 +352,38 @@ export default function WalletHome() {
                       >
                         {payingExpenseIds.has(expense.id) ? 'Atualizando...' : t(locale, 'markAsPaid')}
                       </button>
+                      </>
                     )}
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        <h2 className="mb-3 mt-8 flex items-center gap-2 text-lg font-semibold">
+          <TrendingUp size={18} className="text-blue-300" /> Entradas do mês
+        </h2>
+
+        {entries.length === 0 ? (
+          <p className="text-slate-400">Nenhuma entrada neste mês.</p>
+        ) : (
+          <div className="space-y-2">
+            {entries.map((entry) => (
+              <Card key={entry.id} className="border-blue-500/60 bg-blue-500/20">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{entry.description}</p>
+                    <p className="text-sm text-slate-400">{formatDate(entry.receivedAt, locale)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-blue-300">+{formatCurrency(entry.amount, currency, locale)}</p>
+                    <button
+                      onClick={() => deleteEntry(entry)}
+                      className="rounded px-1 text-xs text-slate-300 underline transition-colors hover:bg-white/10 hover:text-white"
+                    >
+                      Excluir
+                    </button>
                   </div>
                 </div>
               </Card>

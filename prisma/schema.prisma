@@ -22,6 +22,7 @@ model User {
   invitesSent        WalletInvite[]  @relation("InvitedBy")
   expensesCreated    Expense[]       @relation("CreatedBy")
   expensesPaid       Expense[]       @relation("PaidBy")
+  incomeEntriesCreated IncomeEntry[] @relation("IncomeCreatedBy")
   seriesCreated      ExpenseSeries[] @relation("SeriesCreatedBy")
   seriesDefaultPayer ExpenseSeries[] @relation("SeriesDefaultPayer")
   mcpCredentials     McpCredential[]
@@ -84,6 +85,7 @@ model Wallet {
   categories  Category[]
   series      ExpenseSeries[]
   expenses    Expense[]
+  incomeEntries IncomeEntry[]
 }
 
 model WalletMember {
@@ -96,8 +98,21 @@ model WalletMember {
 
   wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  extraIncomes MemberIncome[]
 
   @@unique([walletId, userId])
+}
+
+model MemberIncome {
+  id          String   @id @default(cuid())
+  memberId    String
+  description String
+  amount      Int
+  createdAt   DateTime @default(now())
+
+  member WalletMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
 }
 
 model WalletInvite {
@@ -175,6 +190,22 @@ model Expense {
   createdBy  User           @relation("CreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
   category   Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   categoryId String?
+}
+
+model IncomeEntry {
+  id          String   @id @default(cuid())
+  walletId    String
+  description String
+  amount      Int
+  receivedAt  DateTime
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  wallet    Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  createdBy User   @relation("IncomeCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([walletId, receivedAt])
 }
 
 model McpIdempotencyRecord {

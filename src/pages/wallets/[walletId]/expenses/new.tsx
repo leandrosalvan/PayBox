@@ -9,7 +9,7 @@ import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
 import { t, SupportedLocale, SupportedCurrency, formatCurrency } from '@/lib/locales'
 import { floatToCents } from '@/lib/utils'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, TrendingDown } from 'lucide-react'
 import Link from 'next/link'
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
@@ -86,7 +86,9 @@ export default function NewExpense() {
             <ArrowLeft size={20} className="mr-1" /> Voltar
           </Link>
         </div>
-        <h1 className="mb-6 text-2xl font-bold">{t(locale, 'addExpense')}</h1>
+        <h1 className="mb-6 flex items-center gap-2 text-2xl font-bold">
+          <span className="rounded-lg bg-red-500/20 p-2 text-red-300"><TrendingDown size={22} /></span> {t(locale, 'addExpense')}
+        </h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label={t(locale, 'description')} value={description} onChange={(e: ChangeEvent<HTMLInputElement>) => setDescription(e.target.value)} required />
           <Input
