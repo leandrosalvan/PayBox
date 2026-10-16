@@ -43,3 +43,5 @@ dev.err
 
 # TS build info
 tsconfig.tsbuildinfo
+.vercel
+
