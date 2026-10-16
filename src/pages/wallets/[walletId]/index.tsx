@@ -309,52 +309,34 @@ export default function WalletHome() {
                   expense.status === 'overdue' && 'border-red-500 bg-red-500/30 shadow-[0_0_12px_rgba(239,68,68,0.25)]'
                 )}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="font-medium">{expense.description}</p>
-                    <p className="text-sm text-slate-400">
-                      {formatDate(expense.dueDate, locale)} · {expense.category?.name || 'Sem categoria'}
-                      {expense.series?.type === 'installment' && expense.installmentNumber !== null && (
-                        <span> · {expense.installmentNumber}/{expense.series.totalInstallments}</span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{formatCurrency(expense.amount, currency, locale)}</p>
-                    {expense.status === 'paid' ? (
-                      <>
-                        <p className="text-xs text-primary-400">
-                          {paidLabel(expense, locale)}
-                        </p>
-                        <button
-                          disabled={payingExpenseIds.has(expense.id)}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (confirm(t(locale, 'undoPaymentConfirm'))) togglePay(expense)
-                          }}
-                          className="rounded px-1 text-xs text-slate-300 underline transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-60"
-                        >
-                          {payingExpenseIds.has(expense.id) ? 'Atualizando...' : t(locale, 'undoPayment')}
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <p className={cn('text-xs font-medium', expense.status === 'overdue' ? 'text-red-300' : 'text-yellow-300')}>
-                          {t(locale, expense.status === 'overdue' ? 'statusOverdue' : 'statusOpen')}
-                        </p>
-                      <button
-                        disabled={payingExpenseIds.has(expense.id)}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          togglePay(expense)
-                        }}
-                        className="rounded px-1 text-xs text-slate-300 underline transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-60"
-                      >
-                        {payingExpenseIds.has(expense.id) ? 'Atualizando...' : t(locale, 'markAsPaid')}
-                      </button>
-                      </>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
+                  <p className="break-words font-medium leading-tight">{expense.description}</p>
+                  <p className="whitespace-nowrap text-right font-semibold">{formatCurrency(expense.amount, currency, locale)}</p>
+                  <p className="col-span-2 truncate text-sm text-slate-400">
+                    {formatDate(expense.dueDate, locale)} · {expense.category?.name || 'Sem categoria'}
+                    {expense.series?.type === 'installment' && expense.installmentNumber !== null && (
+                      <span> · {expense.installmentNumber}/{expense.series.totalInstallments}</span>
                     )}
-                  </div>
+                  </p>
+                  {expense.status === 'paid' ? (
+                    <p className="truncate text-xs text-primary-400">{paidLabel(expense, locale)}</p>
+                  ) : (
+                    <p className={cn('text-xs font-medium', expense.status === 'overdue' ? 'text-red-300' : 'text-yellow-300')}>
+                      {t(locale, expense.status === 'overdue' ? 'statusOverdue' : 'statusOpen')}
+                    </p>
+                  )}
+                  <button
+                    disabled={payingExpenseIds.has(expense.id)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (expense.status !== 'paid' || confirm(t(locale, 'undoPaymentConfirm'))) togglePay(expense)
+                    }}
+                    className="whitespace-nowrap rounded px-1 text-right text-xs text-slate-300 underline transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {payingExpenseIds.has(expense.id)
+                      ? 'Atualizando...'
+                      : t(locale, expense.status === 'paid' ? 'undoPayment' : 'markAsPaid')}
+                  </button>
                 </div>
               </Card>
             ))}
