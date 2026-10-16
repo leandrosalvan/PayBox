@@ -78,7 +78,7 @@ Para envio de e-mails (redefinição de senha), configure uma conta de remetente
    - `https://paybox-8j56.onrender.com`
 4. Confirme que `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` estão preenchidos nas variáveis de ambiente do Render
 
-## Deploy no Render
+## Deploy no Render ou Vercel
 
 A forma mais fácil é usar o **Blueprint** do Render com o arquivo `render.yaml`:
 
@@ -95,6 +95,20 @@ A forma mais fácil é usar o **Blueprint** do Render com o arquivo `render.yaml
 
 > O arquivo `render.yaml` já define o build, start e `NEXTAUTH_SECRET` automático.
 > O build converte o Prisma para PostgreSQL e já aplica o schema no banco (Neon).
+
+### Vercel
+
+O arquivo `vercel.json` configura o build Next.js. O desenvolvimento local continua usando SQLite; o script `scripts/vercel-build.sh` troca o provider somente no ambiente isolado do build e exige `DATABASE_URL` configurada na Vercel.
+
+Antes do primeiro deploy, configure em Production e Preview:
+
+- `DATABASE_URL` apontando para PostgreSQL
+- `NEXTAUTH_URL` com a URL pública da Vercel
+- `NEXTAUTH_SECRET` com um segredo forte
+- `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`, se o login Google for usado
+- `BREVO_SMTP_USER`, `BREVO_SMTP_PASS` e `FROM_EMAIL`, se o envio de e-mail for usado
+
+O schema deve ser aplicado uma vez no PostgreSQL escolhido com `npx prisma db push` usando a variável de produção. O build não executa essa alteração automaticamente.
 
 > Antes do primeiro deploy com as tabelas MCP, faça backup verificado e revise o backfill de proprietários. Backup, `db push`, deploy, execução do backfill e alteração das variáveis de produção são ações separadas e não são executadas automaticamente neste fluxo de desenvolvimento.
 

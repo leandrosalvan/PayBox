@@ -1,0 +1,7 @@
+.env
+.env.local
+.env.*.local
+_BD_local/
+.hermes/
+.next/
+node_modules/
