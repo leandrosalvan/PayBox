@@ -32,7 +32,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'PATCH') {
-    if (membership.role !== 'owner') return res.status(403).json({ error: 'Apenas o proprietário pode alterar salários' })
     const { memberId, salary } = req.body
     if (typeof memberId !== 'string' || !Number.isSafeInteger(salary) || salary < 0) {
       return res.status(400).json({ error: 'Dados inválidos' })

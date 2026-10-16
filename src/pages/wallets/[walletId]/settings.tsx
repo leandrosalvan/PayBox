@@ -52,6 +52,41 @@ function SalaryInput({ salary, onCommit }: { salary: number; onCommit: (value: s
   )
 }
 
+function IncomeForm({ onAdd }: { onAdd: (description: string, value: string) => Promise<boolean> }) {
+  const [description, setDescription] = useState('')
+  const [value, setValue] = useState('')
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (await onAdd(description, value)) {
+      setDescription('')
+      setValue('')
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="mt-2 flex gap-2">
+      <Input
+        value={description}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => setDescription(e.target.value)}
+        placeholder="Ex.: Freelance"
+        className="flex-1 py-1 text-sm"
+      />
+      <Input
+        type="text"
+        inputMode="decimal"
+        value={value}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
+        placeholder="0,00"
+        className="w-24 py-1 text-sm"
+      />
+      <Button type="submit" size="sm">
+        +
+      </Button>
+    </form>
+  )
+}
+
 export default function WalletSettings() {
   const router = useRouter()
   const { walletId } = router.query
@@ -113,6 +148,32 @@ export default function WalletSettings() {
       body: JSON.stringify({ memberId, salary: floatToCents(parseFloat(salary.replace(',', '.'))) }),
     })
     if (res.ok) fetchData()
+  }
+
+  async function addIncome(memberId: string, description: string, value: string) {
+    const parsed = parseFloat(value.replace(',', '.'))
+    if (!description.trim() || Number.isNaN(parsed) || parsed <= 0) {
+      setError('Informe a descrição e um valor maior que zero')
+      return false
+    }
+    setError('')
+    const res = await fetch(`/api/wallets/${walletId}/incomes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memberId, description, amount: floatToCents(parsed) }),
+    })
+    if (!res.ok) {
+      setError((await res.json().catch(() => ({}))).error || 'Não foi possível adicionar a renda')
+      return false
+    }
+    fetchData()
+    return true
+  }
+
+  async function removeIncome(id: string) {
+    if (!confirm('Remover esta renda?')) return
+    await fetch(`/api/wallets/${walletId}/incomes?id=${id}`, { method: 'DELETE' })
+    fetchData()
   }
 
   async function removeMember(memberId: string) {
@@ -227,19 +288,36 @@ export default function WalletSettings() {
           <h2 className="mb-2 text-lg font-semibold">{t(locale, 'members')}</h2>
           <div className="space-y-2">
             {members.map((member) => (
-              <Card key={member.id} className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{member.user.name || member.user.email}</p>
-                  <p className="text-xs text-slate-400">{member.user.email}</p>
+              <Card key={member.id}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0 break-words">
+                    <p className="font-medium">{member.user.name || member.user.email}</p>
+                    <p className="break-all text-xs text-slate-400">{member.user.email}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <SalaryInput
+                      salary={member.salary}
+                      onCommit={(value) => updateSalary(member.id, value)}
+                    />
+                    <Button variant="danger" size="sm" onClick={() => removeMember(member.id)}>
+                      ×
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <SalaryInput
-                    salary={member.salary}
-                    onCommit={(value) => updateSalary(member.id, value)}
-                  />
-                  <Button variant="danger" size="sm" onClick={() => removeMember(member.id)}>
-                    ×
-                  </Button>
+                <div className="mt-3 border-t border-dark-700 pt-3">
+                  <p className="mb-2 text-xs uppercase tracking-wide text-slate-400">Outras rendas (mensais)</p>
+                  {(member.extraIncomes ?? []).map((income: any) => (
+                    <div key={income.id} className="mb-1 flex items-center justify-between text-sm">
+                      <span>{income.description}</span>
+                      <span className="flex items-center gap-2">
+                        {formatSalary(income.amount)}
+                        <button onClick={() => removeIncome(income.id)} className="font-bold text-red-400 hover:opacity-80">
+                          ×
+                        </button>
+                      </span>
+                    </div>
+                  ))}
+                  <IncomeForm onAdd={(description, value) => addIncome(member.id, description, value)} />
                 </div>
               </Card>
             ))}

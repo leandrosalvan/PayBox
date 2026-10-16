@@ -21,7 +21,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const wallet = await prisma.wallet.findUnique({
       where: { id: walletId },
       include: {
-        members: { include: { user: { select: { id: true, name: true, email: true, image: true } } } },
+        members: {
+          include: {
+            user: { select: { id: true, name: true, email: true, image: true } },
+            extraIncomes: { orderBy: { createdAt: 'asc' } },
+          },
+        },
         categories: true,
       },
     })
@@ -30,7 +35,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'PUT') {
-    if (membership.role !== 'owner') return res.status(403).json({ error: 'Apenas o proprietário pode editar a carteira' })
     const { name, locale, currency, salaryMode, expectedUpdatedAt } = req.body
     if (typeof expectedUpdatedAt !== 'string') return res.status(400).json({ error: 'Versão da carteira obrigatória' })
     if (salaryMode !== undefined && salaryMode !== 'joint' && salaryMode !== 'separate') {

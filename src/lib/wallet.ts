@@ -16,7 +16,12 @@ export async function getWalletWithMembers(walletId: string) {
   return prisma.wallet.findUnique({
     where: { id: walletId },
     include: {
-      members: { include: { user: { select: { id: true, name: true, email: true, image: true } } } },
+      members: {
+        include: {
+          user: { select: { id: true, name: true, email: true, image: true } },
+          extraIncomes: { orderBy: { createdAt: 'asc' } },
+        },
+      },
       categories: true,
     },
   })

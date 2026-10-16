@@ -10,7 +10,7 @@ import Select from '@/components/ui/Select'
 import Card from '@/components/ui/Card'
 import { formatCurrency, supportedCurrencies, supportedLocales, t, SupportedLocale, SupportedCurrency } from '@/lib/locales'
 import type { ChangeEvent } from 'react'
-import { Plug, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { getLatestWalletId } from '@/lib/wallet'
 
@@ -122,17 +122,6 @@ export default function Wallets() {
       <div className="py-4">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-bold">{t('pt-BR', 'wallets')}</h1>
-          <div className="flex items-center gap-1">
-            <Link
-              href="/settings/integrations"
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-dark-700"
-            >
-              <Plug size={17} /> Integrações
-            </Link>
-            <Button variant="ghost" onClick={() => router.push('/api/auth/signout')}>
-              Sair
-            </Button>
-          </div>
         </div>
 
         {invites.length > 0 && (
