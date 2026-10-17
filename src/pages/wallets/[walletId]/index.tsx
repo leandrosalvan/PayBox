@@ -24,6 +24,8 @@ export default function WalletHome() {
   const [wallet, setWallet] = useState<any>(null)
   const [expenses, setExpenses] = useState<any[]>([])
   const [entries, setEntries] = useState<any[]>([])
+  const [sortMode, setSortMode] = useState<'date' | 'overdue'>('date')
+  const [fabOpen, setFabOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [payingExpenseIds, setPayingExpenseIds] = useState<Set<string>>(() => new Set())
   const [mutationError, setMutationError] = useState('')
@@ -109,6 +111,22 @@ export default function WalletHome() {
     return { paid, pending, overdue, total: paid + pending + overdue }
   }, [expenses])
 
+  useEffect(() => {
+    if (!fabOpen) return
+    const close = (e: KeyboardEvent) => e.key === 'Escape' && setFabOpen(false)
+    window.addEventListener('keydown', close)
+    return () => window.removeEventListener('keydown', close)
+  }, [fabOpen])
+
+  const sortedExpenses = useMemo(() => {
+    const byDate = (a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+    const list = [...expenses]
+    if (sortMode === 'overdue') {
+      return list.sort((a, b) => Number(b.status === 'overdue') - Number(a.status === 'overdue') || byDate(a, b))
+    }
+    return list.sort(byDate)
+  }, [expenses, sortMode])
+
   const income = useMemo(() => {
     const members: any[] = wallet?.members ?? []
     const memberIncome = (m: any) =>
@@ -136,20 +154,24 @@ export default function WalletHome() {
 
   return (
     <AppLayout title={`${wallet.name} - PayBox`}>
-      <div className="py-4">
-        <div className="mb-4 flex items-center justify-between">
-          <Link href="/wallets?all=1" className="flex items-center text-slate-400 hover:text-white">
-            <ArrowLeft size={20} className="mr-1" /> {t(locale, 'wallets')}
+      <div className="py-4 pb-28">
+        <div className="-mt-1.5 mb-4 flex min-h-9 items-center gap-1 pr-20">
+          <Link
+            href="/wallets?all=1"
+            title={t(locale, 'wallets')}
+            aria-label={t(locale, 'wallets')}
+            className="-ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-dark-700 hover:text-white"
+          >
+            <ArrowLeft size={22} />
           </Link>
-        </div>
-
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <h1 className="min-w-0 break-words text-2xl font-bold">{wallet.name}</h1>
           <Link
             href={`/wallets/${walletId}/settings`}
-            className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-dark-800 px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-dark-700 hover:text-white"
+            title="Ajustes da carteira"
+            aria-label={`Ajustes da carteira ${wallet.name}`}
+            className="group flex min-w-0 items-center gap-2 rounded-lg py-1 text-white"
           >
-            <Settings size={16} /> <span className="hidden min-[400px]:inline">Ajustes da carteira</span><span className="min-[400px]:hidden">Ajustes</span>
+            <Settings size={18} className="shrink-0 text-slate-400 transition-colors group-hover:text-white" />
+            <h1 className="truncate text-xl font-bold min-[400px]:text-2xl">{wallet.name}</h1>
           </Link>
         </div>
 
@@ -263,9 +285,9 @@ export default function WalletHome() {
               <p className="relative mt-1 text-sm font-semibold text-red-400 [text-shadow:0_1px_3px_rgba(0,0,0,0.75)] sm:text-base">{formatCurrency(totals.overdue, currency, locale)}</p>
             </Card>
             <Card className="relative overflow-hidden p-3">
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-yellow-400/50 via-yellow-400/20 to-yellow-400/0" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-slate-300/40 via-slate-300/15 to-slate-300/0" />
               <p className="relative text-xs font-medium text-slate-200 [text-shadow:0_1px_3px_rgba(0,0,0,0.75)]">{t(locale, 'totalPending')}</p>
-              <p className="relative mt-1 text-sm font-semibold text-yellow-400 [text-shadow:0_1px_3px_rgba(0,0,0,0.75)] sm:text-base">{formatCurrency(totals.pending, currency, locale)}</p>
+              <p className="relative mt-1 text-sm font-semibold text-slate-200 [text-shadow:0_1px_3px_rgba(0,0,0,0.75)] sm:text-base">{formatCurrency(totals.pending, currency, locale)}</p>
             </Card>
             <Card className="relative overflow-hidden p-3">
               <div className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-green-500/50 via-green-500/20 to-green-500/0" />
@@ -275,32 +297,33 @@ export default function WalletHome() {
           </div>
         </div>
 
-        <div className="mb-4 mt-5 grid grid-cols-2 justify-items-center gap-2.5">
-          <Link
-            href={`/wallets/${walletId}/entries/new?month=${monthKey}`}
-            className="relative flex w-full max-w-[112px] items-center justify-center overflow-hidden rounded-full bg-gradient-to-r from-blue-600 to-blue-500 min-h-[48px] px-4 py-1.5 text-center text-sm font-bold leading-tight text-white shadow-lg shadow-blue-900/40 transition active:scale-95 hover:brightness-110"
-          >
-            <TrendingUp aria-hidden size={68} strokeWidth={2.5} className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/20" />
-            <span className="relative [text-shadow:0_1px_4px_rgba(0,0,0,0.55)]">Nova<br />entrada</span>
-          </Link>
-          <Link
-            href={`/wallets/${walletId}/expenses/new`}
-            className="relative flex w-full max-w-[112px] items-center justify-center overflow-hidden rounded-full bg-gradient-to-r from-rose-600 to-red-500 min-h-[48px] px-4 py-1.5 text-center text-sm font-bold leading-tight text-white shadow-lg shadow-red-900/40 transition active:scale-95 hover:brightness-110"
-          >
-            <TrendingDown aria-hidden size={68} strokeWidth={2.5} className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/20" />
-            <span className="relative [text-shadow:0_1px_4px_rgba(0,0,0,0.55)]">Nova<br />despesa</span>
-          </Link>
+        <div className="mb-3 mt-5 flex items-center justify-between gap-2">
+          <h2 className="flex min-w-0 items-center gap-2 text-base font-semibold min-[400px]:text-lg">
+            <TrendingDown size={18} className="text-red-300" /> Despesas do mês
+          </h2>
+          <div className="flex shrink-0 rounded-full border border-slate-700 bg-dark-800 p-0.5 text-xs font-medium">
+            {([['date', 'Vencimento'], ['overdue', 'Atrasadas']] as const).map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setSortMode(mode)}
+                aria-pressed={sortMode === mode}
+                className={cn(
+                  'rounded-full px-2.5 py-1.5 transition-colors min-[400px]:px-3',
+                  sortMode === mode ? 'bg-slate-200 text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-100'
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
-
-        <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
-          <TrendingDown size={18} className="text-red-300" /> Despesas do mês
-        </h2>
 
         {expenses.length === 0 ? (
           <p className="text-slate-400">{t(locale, 'noExpenses')}</p>
         ) : (
           <div className="space-y-2">
-            {expenses.map((expense) => (
+            {sortedExpenses.map((expense) => (
               <Card
                 key={expense.id}
                 onClick={() => router.push(`/wallets/${walletId}/expenses/${expense.id}`)}
@@ -309,34 +332,38 @@ export default function WalletHome() {
                   expense.status === 'overdue' && 'border-red-500 bg-red-500/30 shadow-[0_0_12px_rgba(239,68,68,0.25)]'
                 )}
               >
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
-                  <p className="break-words font-medium leading-tight">{expense.description}</p>
-                  <p className="whitespace-nowrap text-right font-semibold">{formatCurrency(expense.amount, currency, locale)}</p>
-                  <p className="col-span-2 truncate text-sm text-slate-400">
-                    {formatDate(expense.dueDate, locale)} · {expense.category?.name || 'Sem categoria'}
-                    {expense.series?.type === 'installment' && expense.installmentNumber !== null && (
-                      <span> · {expense.installmentNumber}/{expense.series.totalInstallments}</span>
-                    )}
-                  </p>
-                  {expense.status === 'paid' ? (
-                    <p className="truncate text-xs text-primary-400">{paidLabel(expense, locale)}</p>
-                  ) : (
-                    <p className={cn('text-xs font-medium', expense.status === 'overdue' ? 'text-red-300' : 'text-yellow-300')}>
-                      {t(locale, expense.status === 'overdue' ? 'statusOverdue' : 'statusOpen')}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words font-medium leading-tight">{expense.description}</p>
+                    <p className="mt-1 truncate text-sm text-slate-400">
+                      {formatDate(expense.dueDate, locale)} · {expense.category?.name || 'Sem categoria'}
+                      {expense.series?.type === 'installment' && expense.installmentNumber !== null && (
+                        <span> · {expense.installmentNumber}/{expense.series.totalInstallments}</span>
+                      )}
                     </p>
-                  )}
-                  <button
-                    disabled={payingExpenseIds.has(expense.id)}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (expense.status !== 'paid' || confirm(t(locale, 'undoPaymentConfirm'))) togglePay(expense)
-                    }}
-                    className="whitespace-nowrap rounded px-1 text-right text-xs text-slate-300 underline transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-60"
-                  >
-                    {payingExpenseIds.has(expense.id)
-                      ? 'Atualizando...'
-                      : t(locale, expense.status === 'paid' ? 'undoPayment' : 'markAsPaid')}
-                  </button>
+                  </div>
+                  <div className="flex max-w-[60%] shrink-0 flex-col items-end text-right">
+                    <p className="whitespace-nowrap font-semibold">{formatCurrency(expense.amount, currency, locale)}</p>
+                    {expense.status === 'paid' ? (
+                      <p className="text-xs text-primary-400 [overflow-wrap:anywhere]">{paidLabel(expense, locale)}</p>
+                    ) : (
+                      <p className={cn('text-xs font-medium', expense.status === 'overdue' ? 'text-red-300' : 'text-yellow-300')}>
+                        {t(locale, expense.status === 'overdue' ? 'statusOverdue' : 'statusOpen')}
+                      </p>
+                    )}
+                    <button
+                      disabled={payingExpenseIds.has(expense.id)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (expense.status !== 'paid' || confirm(t(locale, 'undoPaymentConfirm'))) togglePay(expense)
+                      }}
+                      className="whitespace-nowrap rounded px-1 text-xs text-slate-300 underline transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-60"
+                    >
+                      {payingExpenseIds.has(expense.id)
+                        ? 'Atualizando...'
+                        : t(locale, expense.status === 'paid' ? 'undoPayment' : 'markAsPaid')}
+                    </button>
+                  </div>
                 </div>
               </Card>
             ))}
@@ -380,6 +407,37 @@ export default function WalletHome() {
             </Button>
           </Link>
         </div>
+      </div>
+
+      {fabOpen && <div className="fixed inset-0 z-30 bg-black/60" onClick={() => setFabOpen(false)} aria-hidden />}
+      <div className="fixed bottom-5 right-4 z-40 flex flex-col items-end gap-3 pb-[env(safe-area-inset-bottom)] sm:right-[max(1rem,calc(50%-20rem))]">
+        {fabOpen && (
+          <>
+            <Link
+              href={`/wallets/${walletId}/entries/new?month=${monthKey}`}
+              className="flex items-center gap-3 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 py-2.5 pl-5 pr-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition active:scale-95"
+            >
+              Nova entrada
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20"><TrendingUp size={20} /></span>
+            </Link>
+            <Link
+              href={`/wallets/${walletId}/expenses/new`}
+              className="flex items-center gap-3 rounded-full bg-gradient-to-r from-rose-600 to-red-500 py-2.5 pl-5 pr-3 text-sm font-bold text-white shadow-lg shadow-red-900/40 transition active:scale-95"
+            >
+              Nova despesa
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20"><TrendingDown size={20} /></span>
+            </Link>
+          </>
+        )}
+        <button
+          type="button"
+          onClick={() => setFabOpen((open) => !open)}
+          aria-expanded={fabOpen}
+          aria-label={fabOpen ? 'Fechar menu' : 'Adicionar entrada ou despesa'}
+          className="flex h-14 w-14 items-center justify-center rounded-full border border-slate-600 bg-slate-200 text-slate-900 shadow-xl shadow-black/50 transition hover:bg-white active:scale-95"
+        >
+          <Plus size={28} className={cn('transition-transform duration-200', fabOpen && 'rotate-45')} />
+        </button>
       </div>
     </AppLayout>
   )
