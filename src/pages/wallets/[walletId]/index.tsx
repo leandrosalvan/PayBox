@@ -345,7 +345,7 @@ export default function WalletHome() {
                   <div className="flex max-w-[60%] shrink-0 flex-col items-end text-right">
                     <p className="whitespace-nowrap font-semibold">{formatCurrency(expense.amount, currency, locale)}</p>
                     {expense.status === 'paid' ? (
-                      <p className="text-xs text-primary-400">{paidLabel(expense, locale)}</p>
+                      <p className="text-xs text-primary-400 [overflow-wrap:anywhere]">{paidLabel(expense, locale)}</p>
                     ) : (
                       <p className={cn('text-xs font-medium', expense.status === 'overdue' ? 'text-red-300' : 'text-yellow-300')}>
                         {t(locale, expense.status === 'overdue' ? 'statusOverdue' : 'statusOpen')}
