@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { getSession } from 'next-auth/react'
 import { GetServerSideProps } from 'next'
 import AppLayout from '@/components/layout/AppLayout'
+import { openWallet } from '@/lib/last-wallet'
 import Button from '@/components/ui/Button'
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
@@ -39,7 +40,7 @@ export default function AcceptInvite() {
     const res = await fetch(`/api/invites/${token}`, { method: 'POST' })
     const data = await res.json()
     if (res.ok) {
-      router.push(`/wallets/${data.walletId}`)
+      openWallet(router, data.walletId)
     } else {
       setError(data.error || 'Erro ao aceitar convite')
     }
@@ -47,7 +48,7 @@ export default function AcceptInvite() {
   }
 
   return (
-    <AppLayout title="Convite - PayBox">
+    <AppLayout title="PayBox - Convite">
       <div className="flex h-[80vh] flex-col items-center justify-center text-center">
         <h1 className="mb-4 text-2xl font-bold">Convite para PayBox</h1>
         {error && <p className="mb-4 text-red-400">{error}</p>}

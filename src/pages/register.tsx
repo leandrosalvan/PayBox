@@ -40,7 +40,7 @@ export default function Register() {
   }
 
   return (
-    <AppLayout title="Criar conta - PayBox">
+    <AppLayout title="PayBox - Criar conta">
       <div className="py-8">
         <h1 className="mb-6 text-center text-2xl font-bold">Criar conta</h1>
         <form onSubmit={handleSubmit} className="w-full space-y-4">

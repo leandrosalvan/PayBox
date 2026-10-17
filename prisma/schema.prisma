@@ -14,6 +14,8 @@ model User {
   name               String?
   image              String?
   password           String?
+  locale             String          @default("pt-BR")
+  currency           String          @default("BRL")
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
   accounts           Account[]

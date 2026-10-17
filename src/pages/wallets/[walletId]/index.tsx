@@ -6,10 +6,12 @@ import { GetServerSideProps } from 'next'
 import AppLayout from '@/components/layout/AppLayout'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
-import { formatCurrency, formatDate, formatMonthYear, paidLabel, t, SupportedLocale, SupportedCurrency } from '@/lib/locales'
+import { formatCurrency, formatDate, formatMonthYear, paidLabel, t } from '@/lib/locales'
+import { useWalletId } from '@/lib/last-wallet'
+import { usePreferences } from '@/lib/use-preferences'
 import { cn } from '@/lib/utils'
 import { expenseMutationError, setExpensePaymentWithConflictRetry } from '@/lib/expense-payment'
-import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Settings, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const session = await getSession(context)
@@ -18,8 +20,9 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 }
 
 export default function WalletHome() {
+  const { locale, currency } = usePreferences()
   const router = useRouter()
-  const { walletId } = router.query
+  const walletId = useWalletId()
   const { data: session } = useSession()
   const [wallet, setWallet] = useState<any>(null)
   const [expenses, setExpenses] = useState<any[]>([])
@@ -58,11 +61,11 @@ export default function WalletHome() {
   }, [monthKey, walletId])
 
   async function deleteEntry(entry: any) {
-    if (!confirm(`Excluir a entrada "${entry.description}"?`)) return
+    if (!confirm(`Excluir a receita "${entry.description}"?`)) return
     setMutationError('')
     const res = await fetch(`/api/wallets/${walletId}/entries?id=${entry.id}`, { method: 'DELETE' })
     if (res.ok) await fetchEntries()
-    else setMutationError('Não foi possível excluir a entrada')
+    else setMutationError('Não foi possível excluir a receita')
   }
 
   useEffect(() => {
@@ -101,8 +104,6 @@ export default function WalletHome() {
     setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + offset, 1))
   }
 
-  const locale = (wallet?.locale as SupportedLocale) || 'pt-BR'
-  const currency = (wallet?.currency as SupportedCurrency) || 'BRL'
 
   const totals = useMemo(() => {
     const paid = expenses.filter((e) => e.status === 'paid').reduce((s, e) => s + e.amount, 0)
@@ -153,28 +154,22 @@ export default function WalletHome() {
   }
 
   return (
-    <AppLayout title={`${wallet.name} - PayBox`}>
+    <AppLayout
+      title={`PayBox - ${wallet.name}`}
+      backHref="/wallets?all=1"
+      backLabel={t(locale, 'wallets')}
+      nav={
+        <Link
+          href={`/wallet/settings`}
+          title="Ajustes da carteira"
+          aria-label={`Ajustes da carteira ${wallet.name}`}
+          className="block min-w-0 text-white hover:text-primary-300"
+        >
+          <h1 className="truncate text-lg font-bold">{wallet.name}</h1>
+        </Link>
+      }
+    >
       <div className="py-4 pb-28">
-        <div className="-mt-1.5 mb-4 flex min-h-9 items-center gap-1 pr-20">
-          <Link
-            href="/wallets?all=1"
-            title={t(locale, 'wallets')}
-            aria-label={t(locale, 'wallets')}
-            className="-ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-dark-700 hover:text-white"
-          >
-            <ArrowLeft size={22} />
-          </Link>
-          <Link
-            href={`/wallets/${walletId}/settings`}
-            title="Ajustes da carteira"
-            aria-label={`Ajustes da carteira ${wallet.name}`}
-            className="group flex min-w-0 items-center gap-2 rounded-lg py-1 text-white"
-          >
-            <Settings size={18} className="shrink-0 text-slate-400 transition-colors group-hover:text-white" />
-            <h1 className="truncate text-xl font-bold min-[400px]:text-2xl">{wallet.name}</h1>
-          </Link>
-        </div>
-
         {(() => {
           const monthNav = (
             <div className="flex items-center justify-between gap-1 p-3">
@@ -239,7 +234,7 @@ export default function WalletHome() {
                 <div className="space-y-3 border-t border-slate-700/60 p-4">
                   {income.entriesTotal > 0 && (
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-300">Entradas avulsas do mês</span>
+                      <span className="text-slate-300">Receitas avulsas do mês</span>
                       <span className="font-semibold text-blue-300">+{formatCurrency(income.entriesTotal, currency, locale)}</span>
                     </div>
                   )}
@@ -326,7 +321,7 @@ export default function WalletHome() {
             {sortedExpenses.map((expense) => (
               <Card
                 key={expense.id}
-                onClick={() => router.push(`/wallets/${walletId}/expenses/${expense.id}`)}
+                onClick={() => router.push(`/wallet/expenses/${expense.id}`)}
                 className={cn(
                   expense.status === 'paid' && 'border-green-500 bg-green-500/30 shadow-[0_0_12px_rgba(16,185,129,0.25)]',
                   expense.status === 'overdue' && 'border-red-500 bg-red-500/30 shadow-[0_0_12px_rgba(239,68,68,0.25)]'
@@ -371,11 +366,11 @@ export default function WalletHome() {
         )}
 
         <h2 className="mb-3 mt-8 flex items-center gap-2 text-lg font-semibold">
-          <TrendingUp size={18} className="text-blue-300" /> Entradas do mês
+          <TrendingUp size={18} className="text-blue-300" /> Receitas do mês
         </h2>
 
         {entries.length === 0 ? (
-          <p className="text-slate-400">Nenhuma entrada neste mês.</p>
+          <p className="text-slate-400">Nenhuma receita neste mês.</p>
         ) : (
           <div className="space-y-2">
             {entries.map((entry) => (
@@ -401,7 +396,7 @@ export default function WalletHome() {
         )}
 
         <div className="mt-6 flex gap-2">
-          <Link href={`/wallets/${walletId}/reports`} className="flex-1">
+          <Link href={`/wallet/reports`} className="flex-1">
             <Button variant="secondary" className="w-full">
               <Wallet size={16} className="mr-2" /> {t(locale, 'reports')}
             </Button>
@@ -414,17 +409,17 @@ export default function WalletHome() {
         {fabOpen && (
           <>
             <Link
-              href={`/wallets/${walletId}/entries/new?month=${monthKey}`}
-              className="flex items-center gap-3 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 py-2.5 pl-5 pr-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition active:scale-95"
+              href={`/wallet/entries/new?month=${monthKey}`}
+              className="flex w-44 items-center justify-between gap-3 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 py-2.5 pl-5 pr-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition active:scale-95"
             >
-              Nova entrada
+              Nova Receita
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20"><TrendingUp size={20} /></span>
             </Link>
             <Link
-              href={`/wallets/${walletId}/expenses/new`}
-              className="flex items-center gap-3 rounded-full bg-gradient-to-r from-rose-600 to-red-500 py-2.5 pl-5 pr-3 text-sm font-bold text-white shadow-lg shadow-red-900/40 transition active:scale-95"
+              href={`/wallet/expenses/new`}
+              className="flex w-44 items-center justify-between gap-3 rounded-full bg-gradient-to-r from-rose-600 to-red-500 py-2.5 pl-5 pr-3 text-sm font-bold text-white shadow-lg shadow-red-900/40 transition active:scale-95"
             >
-              Nova despesa
+              Nova Despesa
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20"><TrendingDown size={20} /></span>
             </Link>
           </>
@@ -433,7 +428,7 @@ export default function WalletHome() {
           type="button"
           onClick={() => setFabOpen((open) => !open)}
           aria-expanded={fabOpen}
-          aria-label={fabOpen ? 'Fechar menu' : 'Adicionar entrada ou despesa'}
+          aria-label={fabOpen ? 'Fechar menu' : 'Adicionar receita ou despesa'}
           className="flex h-14 w-14 items-center justify-center rounded-full border border-slate-600 bg-slate-200 text-slate-900 shadow-xl shadow-black/50 transition hover:bg-white active:scale-95"
         >
           <Plus size={28} className={cn('transition-transform duration-200', fabOpen && 'rotate-45')} />

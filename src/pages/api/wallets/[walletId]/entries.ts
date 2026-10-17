@@ -65,7 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { id } = req.query
     if (typeof id !== 'string') return res.status(400).json({ error: 'ID inválido' })
     const removed = await prisma.incomeEntry.deleteMany({ where: { id, walletId } })
-    if (removed.count !== 1) return res.status(404).json({ error: 'Entrada não encontrada' })
+    if (removed.count !== 1) return res.status(404).json({ error: 'Receita não encontrada' })
     return res.status(204).end()
   }
 

@@ -7,10 +7,11 @@ import AppLayout from '@/components/layout/AppLayout'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
-import { t, SupportedLocale, SupportedCurrency, formatCurrency } from '@/lib/locales'
+import { t, formatCurrency } from '@/lib/locales'
+import { useWalletId } from '@/lib/last-wallet'
+import { usePreferences } from '@/lib/use-preferences'
 import { floatToCents } from '@/lib/utils'
-import { ArrowLeft, TrendingDown } from 'lucide-react'
-import Link from 'next/link'
+import { TrendingDown } from 'lucide-react'
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const session = await getSession(context)
@@ -19,8 +20,9 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 }
 
 export default function NewExpense() {
+  const { locale } = usePreferences()
   const router = useRouter()
-  const { walletId } = router.query
+  const walletId = useWalletId()
   const [wallet, setWallet] = useState<any>(null)
   const [categories, setCategories] = useState<any[]>([])
   const [description, setDescription] = useState('')
@@ -68,24 +70,17 @@ export default function NewExpense() {
     })
     const data = await res.json()
     if (res.ok) {
-      router.push(`/wallets/${walletId}`)
+      router.push(`/wallet`)
     } else {
       setError(data.error || 'Erro ao criar despesa')
     }
     setLoading(false)
   }
 
-  const locale = (wallet?.locale as SupportedLocale) || 'pt-BR'
-  const currency = (wallet?.currency as SupportedCurrency) || 'BRL'
 
   return (
-    <AppLayout title="Nova despesa - PayBox">
+    <AppLayout title="PayBox - Nova despesa" backHref={`/wallet`}>
       <div className="py-4">
-        <div className="mb-4">
-          <Link href={`/wallets/${walletId}`} className="flex items-center text-slate-400 hover:text-white">
-            <ArrowLeft size={20} className="mr-1" /> Voltar
-          </Link>
-        </div>
         <h1 className="mb-6 flex items-center gap-2 text-2xl font-bold">
           <span className="rounded-lg bg-red-500/20 p-2 text-red-300"><TrendingDown size={22} /></span> {t(locale, 'addExpense')}
         </h1>

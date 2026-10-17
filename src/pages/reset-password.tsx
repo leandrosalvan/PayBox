@@ -36,7 +36,7 @@ export default function ResetPassword() {
   }
 
   return (
-    <AppLayout title="Redefinir senha - PayBox">
+    <AppLayout title="PayBox - Redefinir senha">
       <div className="py-8">
         <h1 className="mb-6 text-center text-2xl font-bold">Nova senha</h1>
         <form onSubmit={handleSubmit} className="w-full space-y-4">

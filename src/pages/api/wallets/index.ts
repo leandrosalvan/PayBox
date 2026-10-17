@@ -47,8 +47,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'POST') {
-    const { name, locale = defaultLocale, currency = defaultCurrency, salaryMode = 'joint' } = req.body
+    const { name, salaryMode = 'joint' } = req.body
     if (!name) return res.status(400).json({ error: 'Nome obrigatório' })
+
+    const preferences = await prisma.user.findUnique({ where: { id: userId }, select: { locale: true, currency: true } })
+    const locale = preferences?.locale ?? defaultLocale
+    const currency = preferences?.currency ?? defaultCurrency
 
     const wallet = await createWalletCommand(userId, { name, locale, currency, salaryMode })
 
