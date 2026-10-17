@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import type { ChangeEvent } from 'react'
 import { getSession } from 'next-auth/react'
@@ -6,11 +6,11 @@ import { GetServerSideProps } from 'next'
 import AppLayout from '@/components/layout/AppLayout'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import Select from '@/components/ui/Select'
+import WhatsAppIcon from '@/components/ui/WhatsAppIcon'
 import Card from '@/components/ui/Card'
-import { t, SupportedLocale, SupportedCurrency, supportedLocales, supportedCurrencies } from '@/lib/locales'
-import { ArrowLeft } from 'lucide-react'
-import Link from 'next/link'
+import { t } from '@/lib/locales'
+import { useWalletId } from '@/lib/last-wallet'
+import { usePreferences } from '@/lib/use-preferences'
 import { floatToCents } from '@/lib/utils'
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
@@ -88,21 +88,24 @@ function IncomeForm({ onAdd }: { onAdd: (description: string, value: string) => 
 }
 
 export default function WalletSettings() {
+  const { locale } = usePreferences()
   const router = useRouter()
-  const { walletId } = router.query
+  const walletId = useWalletId()
   const [wallet, setWallet] = useState<any>(null)
   const [members, setMembers] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [newCategory, setNewCategory] = useState('')
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+
+  const savedName = useRef('')
 
   const fetchData = useCallback(async () => {
     const res = await fetch(`/api/wallets/${walletId}`)
     if (res.ok) {
       const data = await res.json()
       setWallet(data)
+      savedName.current = data.name
       setMembers(data.members)
       setCategories(data.categories)
     }
@@ -113,32 +116,21 @@ export default function WalletSettings() {
     fetchData()
   }, [walletId, fetchData])
 
-  async function handleUpdateWallet(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
+  async function saveWallet(changes: { name?: string; salaryMode?: string }) {
+    setMessage('')
+    setError('')
     const res = await fetch(`/api/wallets/${walletId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...wallet, expectedUpdatedAt: wallet.updatedAt }),
+      body: JSON.stringify({ ...changes, expectedUpdatedAt: wallet.updatedAt }),
     })
     if (res.ok) {
       setMessage('Carteira atualizada')
-      fetchData()
     } else {
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       setError(data.error || 'Erro ao atualizar')
     }
-    setLoading(false)
-  }
-
-  async function copyInviteLink() {
-    if (!inviteLink) return
-    try {
-      await navigator.clipboard.writeText(inviteLink)
-      setMessage('Link copiado para a área de transferência')
-    } catch {
-      setError('Não foi possível copiar o link')
-    }
+    fetchData()
   }
 
   async function updateSalary(memberId: string, salary: string) {
@@ -217,75 +209,61 @@ export default function WalletSettings() {
     )
   }
 
-  const locale = (wallet?.locale as SupportedLocale) || 'pt-BR'
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : process.env.NEXTAUTH_URL || ''
   const inviteLink = wallet ? `${baseUrl}/join/${wallet.inviteToken}` : ''
 
   return (
-    <AppLayout title="Configurações - PayBox">
+    <AppLayout title="PayBox - Configurações" backHref={`/wallet`}>
       <div className="py-4">
-        <div className="mb-4">
-          <Link href={`/wallets/${walletId}`} className="flex items-center text-slate-400 hover:text-white">
-            <ArrowLeft size={20} className="mr-1" /> Voltar
-          </Link>
-        </div>
-        <h1 className="mb-6 text-2xl font-bold">{t(locale, 'settings')}</h1>
+        <h1 className="mb-4 text-2xl font-bold">{t(locale, 'settings')}</h1>
 
         {message && <p className="mb-4 text-sm text-primary-400">{message}</p>}
         {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
 
-        <form onSubmit={handleUpdateWallet} className="mb-6 space-y-4">
-          <h2 className="text-lg font-semibold">Carteira</h2>
-          <Input label={t(locale, 'walletName')} value={wallet.name} onChange={(e: ChangeEvent<HTMLInputElement>) => setWallet({ ...wallet, name: e.target.value })} required />
-          <Select
-            label={t(locale, 'language')}
-            options={supportedLocales}
-            value={wallet.locale}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) => setWallet({ ...wallet, locale: e.target.value })}
+        <div className="mb-4 flex items-center gap-2">
+          <input
+            aria-label={t(locale, 'walletName')}
+            title={t(locale, 'walletName')}
+            value={wallet.name}
+            maxLength={80}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setWallet({ ...wallet, name: e.target.value })}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            onBlur={() => {
+              const name = wallet.name.trim()
+              if (!name) return fetchData()
+              if (name !== savedName.current) saveWallet({ name })
+            }}
+            className="min-w-0 flex-1 rounded-lg border border-slate-600 bg-dark-800 px-3 py-1.5 text-sm text-white focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           />
-          <Select
-            label={t(locale, 'currency')}
-            options={supportedCurrencies}
-            value={wallet.currency}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) => setWallet({ ...wallet, currency: e.target.value })}
-          />
-          <Select
-            label={t(locale, 'salaryMode')}
-            options={[
-              { value: 'joint', label: t(locale, 'joint') },
-              { value: 'separate', label: t(locale, 'separate') },
-            ]}
+          <select
+            aria-label={t(locale, 'salaryMode')}
+            title={t(locale, 'salaryMode')}
             value={wallet.salaryMode}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) => setWallet({ ...wallet, salaryMode: e.target.value })}
-          />
-          <Button type="submit" className="w-full" isLoading={loading}>
-            {t(locale, 'save')}
-          </Button>
-        </form>
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+              setWallet({ ...wallet, salaryMode: e.target.value })
+              saveWallet({ salaryMode: e.target.value })
+            }}
+            className="rounded-lg border border-slate-600 bg-dark-800 px-2 py-1.5 text-sm text-white focus:border-primary-500 focus:outline-none"
+          >
+            <option value="joint">{t(locale, 'joint')}</option>
+            <option value="separate">{t(locale, 'separate')}</option>
+          </select>
+        </div>
 
         <div className="mb-6">
-          <h2 className="mb-2 text-lg font-semibold">{t(locale, 'invite')}</h2>
-          <p className="mb-3 text-sm text-slate-400">Cada carteira tem um link próprio. Compartilhe com quem quiser participar.</p>
-          <div className="flex gap-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">{t(locale, 'members')}</h2>
             <a
               href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Vamos controlar as despesas juntos no PayBox! Entre na carteira: ${inviteLink}`)}`}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700"
+              title="Convidar pelo WhatsApp"
+              aria-label="Convidar pelo WhatsApp"
+              className="flex items-center gap-1.5 rounded-lg bg-[#25D366] px-3 py-1 text-sm font-medium text-white hover:brightness-95"
             >
-              WhatsApp ↗
+              <WhatsAppIcon size={16} /> Convidar
             </a>
-            <button
-              onClick={copyInviteLink}
-              className="flex items-center gap-2 rounded-lg bg-dark-700 px-4 py-2 text-slate-300 hover:bg-dark-600"
-            >
-              📋 Copiar
-            </button>
           </div>
-        </div>
-
-        <div className="mb-6">
-          <h2 className="mb-2 text-lg font-semibold">{t(locale, 'members')}</h2>
           <div className="space-y-2">
             {members.map((member) => (
               <Card key={member.id}>

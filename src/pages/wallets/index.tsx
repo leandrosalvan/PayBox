@@ -8,7 +8,9 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
 import Card from '@/components/ui/Card'
-import { formatCurrency, supportedCurrencies, supportedLocales, t, SupportedLocale, SupportedCurrency } from '@/lib/locales'
+import { formatCurrency, t } from '@/lib/locales'
+import { WALLET_BASE, openWallet, setLastWalletId } from '@/lib/last-wallet'
+import { usePreferences } from '@/lib/use-preferences'
 import type { ChangeEvent } from 'react'
 import { Plus } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
@@ -46,6 +48,7 @@ type WalletItem = {
 }
 
 export default function Wallets() {
+  const { locale, currency } = usePreferences()
   const { data: session } = useSession()
   const router = useRouter()
   const [wallets, setWallets] = useState<WalletItem[]>([])
@@ -54,8 +57,6 @@ export default function Wallets() {
   const [creating, setCreating] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
-  const [locale, setLocale] = useState<SupportedLocale>('pt-BR')
-  const [currency, setCurrency] = useState<SupportedCurrency>('BRL')
   const [salaryMode, setSalaryMode] = useState('joint')
   const [error, setError] = useState('')
 
@@ -88,11 +89,11 @@ export default function Wallets() {
     const res = await fetch('/api/wallets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, locale, currency, salaryMode }),
+      body: JSON.stringify({ name, salaryMode }),
     })
     const data = await res.json()
     if (res.ok) {
-      router.push(`/wallets/${data.id}`)
+      openWallet(router, data.id)
     } else {
       setError(data.error || 'Erro ao criar carteira')
     }
@@ -103,7 +104,7 @@ export default function Wallets() {
     const res = await fetch(`/api/invites/${token}`, { method: 'POST' })
     if (res.ok) {
       const data = await res.json()
-      router.push(`/wallets/${data.walletId}`)
+      openWallet(router, data.walletId)
     }
   }
 
@@ -118,7 +119,7 @@ export default function Wallets() {
   }
 
   return (
-    <AppLayout title="Carteiras - PayBox">
+    <AppLayout title="PayBox - Carteiras">
       <div className="py-4">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-bold">{t('pt-BR', 'wallets')}</h1>
@@ -149,10 +150,10 @@ export default function Wallets() {
               const summary = wallet.summary
               const total = summary.paid + summary.pending + summary.overdue
               const percentPaid = total > 0 ? Math.round((summary.paid / total) * 100) : 0
-              const walletLocale = wallet.locale as SupportedLocale
-              const walletCurrency = wallet.currency as SupportedCurrency
+              const walletLocale = locale
+              const walletCurrency = currency
               return (
-                <Link key={wallet.id} href={`/wallets/${wallet.id}`}>
+                <Link key={wallet.id} href={WALLET_BASE} onClick={() => setLastWalletId(wallet.id)}>
                   <Card>
                     <div className="flex items-center justify-between">
                       <p className="font-medium text-white">{wallet.name}</p>
@@ -210,10 +211,8 @@ export default function Wallets() {
             <h2 className="text-lg font-semibold">{t('pt-BR', 'newWallet')}</h2>
             <Input label={t('pt-BR', 'walletName')} value={name} onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)} required autoFocus={wallets.length > 0} />
             <details className="group">
-              <summary className="cursor-pointer text-sm text-slate-400 hover:text-white">Mais opções (idioma, moeda e salários)</summary>
+              <summary className="cursor-pointer text-sm text-slate-400 hover:text-white">Mais opções (salários)</summary>
               <div className="mt-3 space-y-4">
-                <Select label={t('pt-BR', 'language')} options={supportedLocales} value={locale} onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocale(e.target.value as SupportedLocale)} />
-                <Select label={t('pt-BR', 'currency')} options={supportedCurrencies} value={currency} onChange={(e: ChangeEvent<HTMLSelectElement>) => setCurrency(e.target.value as SupportedCurrency)} />
                 <Select
                   label={t('pt-BR', 'salaryMode')}
                   options={[

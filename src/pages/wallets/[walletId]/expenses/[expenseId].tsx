@@ -7,11 +7,11 @@ import AppLayout from '@/components/layout/AppLayout'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
-import { t, SupportedLocale, SupportedCurrency, formatCurrency, toDateInputValue, paidLabel } from '@/lib/locales'
+import { t, formatCurrency, toDateInputValue, paidLabel } from '@/lib/locales'
+import { useWalletId } from '@/lib/last-wallet'
+import { usePreferences } from '@/lib/use-preferences'
 import { floatToCents } from '@/lib/utils'
 import { expenseMutationError } from '@/lib/expense-payment'
-import { ArrowLeft } from 'lucide-react'
-import Link from 'next/link'
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const session = await getSession(context)
@@ -20,8 +20,10 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 }
 
 export default function ExpenseDetail() {
+  const { locale, currency } = usePreferences()
   const router = useRouter()
-  const { walletId, expenseId } = router.query
+  const walletId = useWalletId()
+  const { expenseId } = router.query
   const [wallet, setWallet] = useState<any>(null)
   const [expense, setExpense] = useState<any>(null)
   const [categories, setCategories] = useState<any[]>([])
@@ -82,7 +84,7 @@ export default function ExpenseDetail() {
         }),
       })
       if (res.ok) {
-        router.push(`/wallets/${walletId}`)
+        router.push(`/wallet`)
         return
       }
 
@@ -111,7 +113,7 @@ export default function ExpenseDetail() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, ...body }),
     })
-    if (res.ok) router.push(`/wallets/${walletId}`)
+    if (res.ok) router.push(`/wallet`)
     else {
       const data = await res.json()
       setError(data.error || 'Erro')
@@ -121,7 +123,7 @@ export default function ExpenseDetail() {
   async function handleDelete() {
     if (!confirm('Tem certeza que deseja excluir esta despesa?')) return
     const res = await fetch(`/api/wallets/${walletId}/expenses/${expenseId}`, { method: 'DELETE' })
-    if (res.ok) router.push(`/wallets/${walletId}`)
+    if (res.ok) router.push(`/wallet`)
   }
 
   if (!expense || !wallet) {
@@ -134,18 +136,11 @@ export default function ExpenseDetail() {
     )
   }
 
-  const locale = (wallet?.locale as SupportedLocale) || 'pt-BR'
-  const currency = (wallet?.currency as SupportedCurrency) || 'BRL'
   const isSeries = !!expense.series
 
   return (
-    <AppLayout title="Despesa - PayBox">
+    <AppLayout title="PayBox - Despesa" backHref={`/wallet`}>
       <div className="py-4">
-        <div className="mb-4">
-          <Link href={`/wallets/${walletId}`} className="flex items-center text-slate-400 hover:text-white">
-            <ArrowLeft size={20} className="mr-1" /> Voltar
-          </Link>
-        </div>
         <h1 className="mb-2 text-2xl font-bold">{expense.description}</h1>
         <p className={`mb-4 text-sm font-medium ${expense.status === 'paid' ? 'text-primary-400' : expense.status === 'overdue' ? 'text-red-400' : 'text-slate-400'}`}>
           {expense.status === 'paid' ? paidLabel(expense, locale) : expense.status === 'overdue' ? t(locale, 'overdue') : t(locale, 'pending')} · {formatCurrency(expense.amount, currency, locale)}

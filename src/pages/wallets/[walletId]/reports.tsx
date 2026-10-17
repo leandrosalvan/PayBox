@@ -1,13 +1,13 @@
 import { useEffect, useState, useMemo } from 'react'
-import { useRouter } from 'next/router'
 import { getSession } from 'next-auth/react'
 import { GetServerSideProps } from 'next'
 import AppLayout from '@/components/layout/AppLayout'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
-import { t, SupportedLocale, SupportedCurrency, formatCurrency, formatMonthYear } from '@/lib/locales'
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
-import Link from 'next/link'
+import { t, formatCurrency, formatMonthYear } from '@/lib/locales'
+import { useWalletId } from '@/lib/last-wallet'
+import { usePreferences } from '@/lib/use-preferences'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
@@ -17,8 +17,8 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 }
 
 export default function Reports() {
-  const router = useRouter()
-  const { walletId } = router.query
+  const { locale, currency } = usePreferences()
+  const walletId = useWalletId()
   const [wallet, setWallet] = useState<any>(null)
   const [report, setReport] = useState<any>(null)
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -37,8 +37,6 @@ export default function Reports() {
     setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + offset, 1))
   }
 
-  const locale = (wallet?.locale as SupportedLocale) || 'pt-BR'
-  const currency = (wallet?.currency as SupportedCurrency) || 'BRL'
 
   if (!wallet || !report) {
     return (
@@ -51,13 +49,8 @@ export default function Reports() {
   }
 
   return (
-    <AppLayout title={`Relatórios - ${wallet.name}`}>
+    <AppLayout title={`PayBox - Relatórios - ${wallet.name}`} backHref={`/wallet`}>
       <div className="py-4">
-        <div className="mb-4">
-          <Link href={`/wallets/${walletId}`} className="flex items-center text-slate-400 hover:text-white">
-            <ArrowLeft size={20} className="mr-1" /> Voltar
-          </Link>
-        </div>
         <h1 className="mb-2 text-2xl font-bold">{t(locale, 'reports')}</h1>
 
         <div className="mb-4 flex items-center justify-between rounded-xl bg-dark-800 p-3">

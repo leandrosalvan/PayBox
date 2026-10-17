@@ -4,6 +4,7 @@ import type { ChangeEvent } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import AppLayout from '@/components/layout/AppLayout'
+import Logo from '@/components/ui/Logo'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { GetServerSideProps } from 'next'
@@ -47,9 +48,9 @@ export default function Login() {
   }
 
   return (
-    <AppLayout title="Entrar - PayBox">
+    <AppLayout title="PayBox - Entrar">
       <div className="flex flex-col items-center justify-center py-12">
-        <h1 className="mb-2 text-3xl font-bold text-primary-400">PayBox</h1>
+        <h1 className="mb-2"><Logo size={48} /></h1>
         <p className="mb-8 text-slate-400">Controle de despesas compartilhado</p>
 
         <form onSubmit={handleSubmit} className="w-full space-y-4">

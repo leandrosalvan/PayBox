@@ -30,7 +30,7 @@ export default function ForgotPassword() {
   }
 
   return (
-    <AppLayout title="Esqueci a senha - PayBox">
+    <AppLayout title="PayBox - Esqueci a senha">
       <div className="py-8">
         <h1 className="mb-6 text-center text-2xl font-bold">Redefinir senha</h1>
         <form onSubmit={handleSubmit} className="w-full space-y-4">

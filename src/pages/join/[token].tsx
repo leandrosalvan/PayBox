@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { getSession, useSession } from 'next-auth/react'
 import { GetServerSideProps } from 'next'
 import AppLayout from '@/components/layout/AppLayout'
+import { openWallet } from '@/lib/last-wallet'
 import Button from '@/components/ui/Button'
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
@@ -39,7 +40,7 @@ export default function JoinWallet({ sessionExists }: { sessionExists: boolean }
     const res = await fetch(`/api/join/${token}`, { method: 'POST' })
     const data = await res.json()
     if (res.ok) {
-      router.push(`/wallets/${data.walletId}`)
+      openWallet(router, data.walletId)
     } else {
       if (res.status === 401) {
         router.push(`/login?callbackUrl=/join/${token}`)
@@ -52,7 +53,7 @@ export default function JoinWallet({ sessionExists }: { sessionExists: boolean }
 
   if (error) {
     return (
-      <AppLayout title="Convite - PayBox">
+      <AppLayout title="PayBox - Convite">
         <div className="flex h-[80vh] flex-col items-center justify-center text-center">
           <h1 className="mb-4 text-2xl font-bold">Convite</h1>
           <p className="text-red-400">{error}</p>
@@ -63,7 +64,7 @@ export default function JoinWallet({ sessionExists }: { sessionExists: boolean }
 
   if (!wallet) {
     return (
-      <AppLayout title="Convite - PayBox">
+      <AppLayout title="PayBox - Convite">
         <div className="flex h-[80vh] items-center justify-center">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
         </div>
@@ -72,7 +73,7 @@ export default function JoinWallet({ sessionExists }: { sessionExists: boolean }
   }
 
   return (
-    <AppLayout title={`Convite - ${wallet.name}`}>
+    <AppLayout title={`PayBox - Convite - ${wallet.name}`}>
       <div className="flex h-[80vh] flex-col items-center justify-center px-4 text-center">
         <h1 className="mb-2 text-2xl font-bold">Você foi convidado</h1>
         <p className="mb-6 text-slate-300">

@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth } from '@/lib/api-auth'
 import { hashPassword, verifyPassword } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { supportedCurrencies, supportedLocales } from '@/lib/locales'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = await requireAuth(req, res)
@@ -9,16 +10,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, email: true, password: true },
+    select: { id: true, name: true, email: true, password: true, locale: true, currency: true },
   })
   if (!user) return res.status(404).json({ error: 'Usuário não encontrado' })
 
   if (req.method === 'GET') {
-    return res.status(200).json({ id: user.id, name: user.name, email: user.email, hasPassword: !!user.password })
+    return res.status(200).json({ id: user.id, name: user.name, email: user.email, hasPassword: !!user.password, locale: user.locale, currency: user.currency })
   }
 
   if (req.method === 'PATCH') {
-    const { name, currentPassword, newPassword } = req.body ?? {}
+    const { name, currentPassword, newPassword, locale, currency } = req.body ?? {}
+
+    if (locale !== undefined || currency !== undefined) {
+      if (!supportedLocales.some((l) => l.value === locale) || !supportedCurrencies.some((c) => c.value === currency)) {
+        return res.status(400).json({ error: 'Idioma ou moeda inválidos' })
+      }
+      await prisma.user.update({ where: { id: userId }, data: { locale, currency } })
+      return res.status(200).json({ locale, currency })
+    }
 
     if (newPassword !== undefined) {
       if (typeof newPassword !== 'string' || newPassword.length < 6) {
